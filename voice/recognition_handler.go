@@ -46,7 +46,7 @@ func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
 	if r.promptCh != nil {
 		select {
 		case r.promptCh <- prompt:
-		default:
+		case <-r.ctx.Done():
 		}
 	}
 
