@@ -77,8 +77,12 @@ func (r *Responder) Respond(ctx context.Context, prompt string) {
 }
 
 func (r *Responder) sendError(err error) {
-	if r.errCh != nil {
-		r.errCh <- err
+	if r.errCh == nil {
+		return
+	}
+	select {
+	case r.errCh <- err:
+	default:
 	}
 }
 
@@ -90,15 +94,17 @@ func (r *Responder) consumeTokens(ctx context.Context, outputTokenCh <-chan core
 	}
 
 	for token := range outputTokenCh {
-		if ctx.Err() != nil {
-			return
-		}
-
 		select {
 		case r.tokenCh <- token:
 		case <-ctx.Done():
-			return
 		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	for range outputTokenCh {
 	}
 }
 
@@ -110,14 +116,16 @@ func (r *Responder) consumeAudios(ctx context.Context, outputAudioCh <-chan core
 	}
 
 	for audio := range outputAudioCh {
-		if ctx.Err() != nil {
-			return
-		}
-
 		select {
 		case r.audioCh <- audio:
 		case <-ctx.Done():
-			return
 		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	for range outputAudioCh {
 	}
 }

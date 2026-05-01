@@ -100,6 +100,10 @@ func (r *Recognizer) Start(ctx context.Context) error {
 func (r *Recognizer) Stop(ctx context.Context) error {
 	r.cancel()
 
+	var errs []error
+	errs = append(errs, r.vad.Stop(ctx))
+	errs = append(errs, r.transcriber.Stop(ctx))
+
 	waitCh := make(chan error, 1)
 	go func() {
 		waitCh <- r.grp.Wait()
@@ -107,10 +111,12 @@ func (r *Recognizer) Stop(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		errs = append(errs, ctx.Err())
 	case err := <-waitCh:
-		return err
+		errs = append(errs, err)
 	}
+
+	return errors.Join(errs...)
 }
 
 func (r *Recognizer) Feed(ctx context.Context, frame core.AudioFrame) error {
