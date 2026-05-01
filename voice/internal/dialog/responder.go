@@ -9,18 +9,20 @@ type ResponderConfig struct {
 	Brain       Brain
 	Synthesizer Synthesizer
 
-	AudioCh chan<- core.AudioFrame
-	TokenCh chan<- core.Token
-	ErrCh   chan<- error
+	AudioCh  chan<- core.AudioFrame
+	TokenCh  chan<- core.Token
+	ErrCh    chan<- error
+	PromptCh chan<- string
 }
 
 type Responder struct {
 	brain       Brain
 	synthesizer Synthesizer
 
-	audioCh chan<- core.AudioFrame
-	tokenCh chan<- core.Token
-	errCh   chan<- error
+	audioCh  chan<- core.AudioFrame
+	tokenCh  chan<- core.Token
+	errCh    chan<- error
+	promptCh chan<- string
 }
 
 func NewResponder(config ResponderConfig) *Responder {
@@ -30,10 +32,19 @@ func NewResponder(config ResponderConfig) *Responder {
 		audioCh:     config.AudioCh,
 		tokenCh:     config.TokenCh,
 		errCh:       config.ErrCh,
+		promptCh:    config.PromptCh,
 	}
 }
 
 func (r *Responder) Respond(ctx context.Context, prompt string) {
+	if r.promptCh != nil {
+		select {
+		case r.promptCh <- prompt:
+		case <-ctx.Done():
+			return
+		}
+	}
+
 	synInputCh := make(chan core.Token)
 	outputTokenCh := make(chan core.Token)
 

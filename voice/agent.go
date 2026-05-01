@@ -66,12 +66,12 @@ func (a *Agent) start(ctx context.Context) error {
 		AudioCh:     a.respAudioCh,
 		TokenCh:     a.respTokenCh,
 		ErrCh:       a.respErrCh,
+		PromptCh:    a.promptCh,
 	})
 
 	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
 		Ctx:       a.ctx,
 		Responder: a.responder,
-		PromptCh:  a.promptCh,
 	})
 
 	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{
