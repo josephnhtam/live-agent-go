@@ -1,7 +1,7 @@
 package core
 
 type AudioFrame struct {
-	Data       []any
+	Data       []int16
 	SampleRate int32
 	Channels   int8
 }
@@ -12,5 +12,6 @@ type Transcript struct {
 }
 
 type Token struct {
-	Text string
+	MessageID string
+	Text      string
 }

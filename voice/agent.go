@@ -25,6 +25,7 @@ type Agent struct {
 	respAudioCh chan<- AudioFrame
 	respTokenCh chan<- Token
 	respErrCh   chan<- error
+	promptCh    chan<- string
 
 	responder          *dialog.Responder
 	recognizer         *speech.Recognizer
@@ -51,6 +52,7 @@ func NewAgent(config AgentConfig, opts ...AgentOption) (*Agent, error) {
 		respAudioCh: options.respAudioCh,
 		respTokenCh: options.respTokenCh,
 		respErrCh:   options.respErrCh,
+		promptCh:    options.promptCh,
 		lock:        sync.Mutex{},
 		started:     atomic.Bool{},
 		stopped:     atomic.Bool{},
@@ -67,7 +69,9 @@ func (a *Agent) start(ctx context.Context) error {
 	})
 
 	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
+		Ctx:       a.ctx,
 		Responder: a.responder,
+		PromptCh:  a.promptCh,
 	})
 
 	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{
@@ -77,6 +81,9 @@ func (a *Agent) start(ctx context.Context) error {
 	})
 
 	if err := a.recognizer.Start(ctx); err != nil {
+		a.recognizer = nil
+		a.recognitionHandler = nil
+		a.responder = nil
 		return errors.Join(ErrStartingRecognizer, err)
 	}
 

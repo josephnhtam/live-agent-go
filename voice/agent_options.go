@@ -4,6 +4,7 @@ type agentOptions struct {
 	respAudioCh chan<- AudioFrame
 	respTokenCh chan<- Token
 	respErrCh   chan<- error
+	promptCh    chan<- string
 }
 
 type AgentOption interface {
@@ -41,5 +42,11 @@ func SubscribeToken(respTokenCh chan<- Token) AgentOption {
 func SubscribeErr(respErrCh chan<- error) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.respErrCh = respErrCh
+	})
+}
+
+func SubscribePrompt(promptCh chan<- string) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.promptCh = promptCh
 	})
 }

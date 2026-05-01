@@ -10,11 +10,15 @@ import (
 )
 
 type recognitionHandlerConfig struct {
+	Ctx       context.Context
 	Responder *dialog.Responder
+	PromptCh  chan<- string
 }
 
 type recognitionHandler struct {
+	ctx       context.Context
 	responder *dialog.Responder
+	promptCh  chan<- string
 
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
@@ -24,7 +28,9 @@ var _ speech.RecognitionHandler = (*recognitionHandler)(nil)
 
 func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler {
 	return &recognitionHandler{
+		ctx:        config.Ctx,
 		responder:  config.Responder,
+		promptCh:   config.PromptCh,
 		mutex:      sync.Mutex{},
 		cancelResp: nil,
 	}
@@ -36,6 +42,13 @@ func (r *recognitionHandler) OnSpeechStart() {
 
 func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
 	prompt := combineTranscripts(transcripts)
+
+	if r.promptCh != nil {
+		select {
+		case r.promptCh <- prompt:
+		default:
+		}
+	}
 
 	ctx := r.createResponseContext()
 	r.responder.Respond(ctx, prompt)
@@ -58,7 +71,7 @@ func (r *recognitionHandler) createResponseContext() (ctx context.Context) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	ctx, r.cancelResp = context.WithCancel(context.Background())
+	ctx, r.cancelResp = context.WithCancel(r.ctx)
 	return
 }
 
