@@ -5,7 +5,7 @@ import (
 	"live-agent-go/voice/core"
 )
 
-type ResponderOptions struct {
+type ResponderConfig struct {
 	Brain       Brain
 	Synthesizer Synthesizer
 
@@ -23,13 +23,13 @@ type Responder struct {
 	errCh   chan<- error
 }
 
-func NewResponder(options ResponderOptions) *Responder {
+func NewResponder(config ResponderConfig) *Responder {
 	return &Responder{
-		brain:       options.Brain,
-		synthesizer: options.Synthesizer,
-		audioCh:     options.AudioCh,
-		tokenCh:     options.TokenCh,
-		errCh:       options.ErrCh,
+		brain:       config.Brain,
+		synthesizer: config.Synthesizer,
+		audioCh:     config.AudioCh,
+		tokenCh:     config.TokenCh,
+		errCh:       config.ErrCh,
 	}
 }
 

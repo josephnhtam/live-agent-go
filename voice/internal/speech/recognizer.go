@@ -9,7 +9,7 @@ import (
 
 const bufferSize = 8
 
-type RecognizerOptions struct {
+type RecognizerConfig struct {
 	VAD         VAD
 	Transcriber Transcriber
 	Handler     RecognitionHandler
@@ -27,13 +27,13 @@ type Recognizer struct {
 	ch chan any
 }
 
-func NewRecognizer(options RecognizerOptions) *Recognizer {
+func NewRecognizer(config RecognizerConfig) *Recognizer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Recognizer{
-		vad:         options.VAD,
-		transcriber: options.Transcriber,
-		handler:     options.Handler,
+		vad:         config.VAD,
+		transcriber: config.Transcriber,
+		handler:     config.Handler,
 
 		ctx:    ctx,
 		cancel: cancel,

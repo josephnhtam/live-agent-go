@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 )
 
-type AgentSetup struct {
+type AgentConfig struct {
 	VAD         VAD
 	Transcriber Transcriber
 	Synthesizer Synthesizer
@@ -17,7 +17,7 @@ type AgentSetup struct {
 }
 
 type Agent struct {
-	setup   AgentSetup
+	config  AgentConfig
 	options *agentOptions
 
 	ctx         context.Context
@@ -35,8 +35,8 @@ type Agent struct {
 	stopped atomic.Bool
 }
 
-func NewAgent(setup AgentSetup, opts ...AgentOption) (*Agent, error) {
-	if err := validateAgentSetup(setup); err != nil {
+func NewAgent(config AgentConfig, opts ...AgentOption) (*Agent, error) {
+	if err := validateAgentConfig(config); err != nil {
 		return nil, err
 	}
 
@@ -44,7 +44,7 @@ func NewAgent(setup AgentSetup, opts ...AgentOption) (*Agent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Agent{
-		setup:       setup,
+		config:      config,
 		options:     options,
 		ctx:         ctx,
 		cancel:      cancel,
@@ -58,21 +58,21 @@ func NewAgent(setup AgentSetup, opts ...AgentOption) (*Agent, error) {
 }
 
 func (a *Agent) start(ctx context.Context) error {
-	a.responder = dialog.NewResponder(dialog.ResponderOptions{
-		Brain:       a.setup.Brain,
-		Synthesizer: a.setup.Synthesizer,
+	a.responder = dialog.NewResponder(dialog.ResponderConfig{
+		Brain:       a.config.Brain,
+		Synthesizer: a.config.Synthesizer,
 		AudioCh:     a.respAudioCh,
 		TokenCh:     a.respTokenCh,
 		ErrCh:       a.respErrCh,
 	})
 
-	a.recognitionHandler = newRecognitionHandler(recognitionHandlerOptions{
+	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
 		Responder: a.responder,
 	})
 
-	a.recognizer = speech.NewRecognizer(speech.RecognizerOptions{
-		VAD:         a.setup.VAD,
-		Transcriber: a.setup.Transcriber,
+	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{
+		VAD:         a.config.VAD,
+		Transcriber: a.config.Transcriber,
 		Handler:     a.recognitionHandler,
 	})
 
@@ -137,20 +137,20 @@ func (a *Agent) Stop(ctx context.Context) error {
 	return nil
 }
 
-func validateAgentSetup(options AgentSetup) error {
-	if options.VAD == nil {
+func validateAgentConfig(config AgentConfig) error {
+	if config.VAD == nil {
 		return ErrInvalidVAD
 	}
 
-	if options.Transcriber == nil {
+	if config.Transcriber == nil {
 		return ErrInvalidTranscriber
 	}
 
-	if options.Brain == nil {
+	if config.Brain == nil {
 		return ErrInvalidBrain
 	}
 
-	if options.Synthesizer == nil {
+	if config.Synthesizer == nil {
 		return ErrInvalidSynthesizer
 	}
 

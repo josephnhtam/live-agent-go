@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-type recognitionHandlerOptions struct {
+type recognitionHandlerConfig struct {
 	Responder *dialog.Responder
 }
 
@@ -22,9 +22,9 @@ type recognitionHandler struct {
 
 var _ speech.RecognitionHandler = (*recognitionHandler)(nil)
 
-func newRecognitionHandler(options recognitionHandlerOptions) *recognitionHandler {
+func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler {
 	return &recognitionHandler{
-		responder:  options.Responder,
+		responder:  config.Responder,
 		mutex:      sync.Mutex{},
 		cancelResp: nil,
 	}
