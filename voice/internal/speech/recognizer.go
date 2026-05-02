@@ -24,7 +24,8 @@ type Recognizer struct {
 	cancel context.CancelFunc
 	grp    *errgroup.Group
 
-	ch chan any
+	ch   chan any
+	done chan error
 }
 
 func NewRecognizer(config RecognizerConfig) *Recognizer {
@@ -63,9 +64,9 @@ func (r *Recognizer) Start(ctx context.Context) error {
 
 			case vadEvent, ok := <-vadCh:
 				if !ok {
-					vadCh = nil
-					continue
+					return ErrVADStopped
 				}
+
 				select {
 				case r.ch <- vadEvent:
 				case <-ctx.Done():
@@ -74,18 +75,14 @@ func (r *Recognizer) Start(ctx context.Context) error {
 
 			case transcript, ok := <-transcribeCh:
 				if !ok {
-					transcribeCh = nil
-					continue
+					return ErrTranscriberStopped
 				}
+
 				select {
 				case r.ch <- transcript:
 				case <-ctx.Done():
 					return nil
 				}
-			}
-
-			if vadCh == nil && transcribeCh == nil {
-				return nil
 			}
 		}
 	})
@@ -94,7 +91,16 @@ func (r *Recognizer) Start(ctx context.Context) error {
 		return r.handleEvent(ctx)
 	})
 
+	r.done = make(chan error, 1)
+	go func() {
+		r.done <- r.grp.Wait()
+	}()
+
 	return nil
+}
+
+func (r *Recognizer) Done() <-chan error {
+	return r.done
 }
 
 func (r *Recognizer) Stop(ctx context.Context) error {

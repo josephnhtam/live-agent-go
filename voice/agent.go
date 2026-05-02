@@ -31,6 +31,7 @@ type Agent struct {
 	recognizer         *speech.Recognizer
 	recognitionHandler *recognitionHandler
 
+	done    chan error
 	lock    sync.Mutex
 	started atomic.Bool
 	stopped atomic.Bool
@@ -87,7 +88,21 @@ func (a *Agent) start(ctx context.Context) error {
 		return errors.Join(ErrStartingRecognizer, err)
 	}
 
+	a.done = make(chan error, 1)
+	go func() {
+		select {
+		case err := <-a.recognizer.Done():
+			a.done <- err
+		case <-a.ctx.Done():
+			a.done <- a.ctx.Err()
+		}
+	}()
+
 	return nil
+}
+
+func (a *Agent) Done() <-chan error {
+	return a.done
 }
 
 func (a *Agent) stop(ctx context.Context) error {
