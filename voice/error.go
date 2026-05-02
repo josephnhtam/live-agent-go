@@ -16,5 +16,6 @@ var (
 
 	ErrStartingVAD         = speech.ErrStartingVAD
 	ErrStartingTranscriber = speech.ErrStartingTranscriber
-	ErrStartingRecognizer  = errors.New("error starting recognizer")
+	ErrStartingRecognizer  = errors.New("failed to start recognizer")
+	ErrSessionDone         = errors.New("session done")
 )

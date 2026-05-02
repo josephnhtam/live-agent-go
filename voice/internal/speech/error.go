@@ -3,8 +3,8 @@ package speech
 import "errors"
 
 var (
-	ErrStartingVAD         = errors.New("error starting VAD")
-	ErrStartingTranscriber = errors.New("error starting Transcriber")
-	ErrFeedingVAD          = errors.New("error feeding VAD")
-	ErrFeedingTranscriber  = errors.New("error feeding Transcriber")
+	ErrStartingVAD         = errors.New("failed to start VAD")
+	ErrStartingTranscriber = errors.New("failed to start Transcriber")
+	ErrFeedingVAD          = errors.New("failed to feed VAD")
+	ErrFeedingTranscriber  = errors.New("failed to feed Transcriber")
 )
