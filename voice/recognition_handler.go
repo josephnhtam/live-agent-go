@@ -20,6 +20,7 @@ type recognitionHandler struct {
 
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
+	respWg     *sync.WaitGroup
 }
 
 var _ speech.RecognitionHandler = (*recognitionHandler)(nil)
@@ -40,24 +41,37 @@ func (r *recognitionHandler) OnSpeechStart() {
 func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
 	prompt := combineTranscripts(transcripts)
 
+	r.CancelResponse()
+	
 	ctx := r.createResponseContext()
-	r.responder.Respond(ctx, prompt)
+	wg := r.responder.Respond(ctx, prompt)
+
+	r.mutex.Lock()
+	r.respWg = wg
+	r.mutex.Unlock()
 }
 
 func (r *recognitionHandler) CancelResponse() {
 	r.mutex.Lock()
+
 	cancel := r.cancelResp
+	wg := r.respWg
+
 	r.cancelResp = nil
+	r.respWg = nil
+
 	r.mutex.Unlock()
 
 	if cancel != nil {
 		cancel()
 	}
+
+	if wg != nil {
+		wg.Wait()
+	}
 }
 
 func (r *recognitionHandler) createResponseContext() (ctx context.Context) {
-	r.CancelResponse()
-
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

@@ -3,6 +3,7 @@ package dialog
 import (
 	"context"
 	"live-agent-go/voice/core"
+	"sync"
 )
 
 type ResponderConfig struct {
@@ -36,12 +37,14 @@ func NewResponder(config ResponderConfig) *Responder {
 	}
 }
 
-func (r *Responder) Respond(ctx context.Context, prompt string) {
+func (r *Responder) Respond(ctx context.Context, prompt string) *sync.WaitGroup {
+	wg := &sync.WaitGroup{}
+
 	if r.promptCh != nil {
 		select {
 		case r.promptCh <- prompt:
 		case <-ctx.Done():
-			return
+			return wg
 		}
 	}
 
@@ -50,50 +53,68 @@ func (r *Responder) Respond(ctx context.Context, prompt string) {
 
 	inputTokenCh, err := r.brain.Generate(ctx, prompt)
 	if err != nil {
-		r.sendError(err)
-		return
+		r.sendError(ctx, err)
+		return wg
 	}
 
 	outputAudioCh, err := r.synthesizer.Synthesize(ctx, synInputCh)
 	if err != nil {
-		r.sendError(err)
-		return
+		r.sendError(ctx, err)
+		return wg
 	}
 
+	wg.Add(3)
+
 	go func() {
-		defer close(synInputCh)
-		defer close(outputTokenCh)
-
-		for token := range inputTokenCh {
-			if ctx.Err() != nil {
-				return
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case synInputCh <- token:
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case outputTokenCh <- token:
-			}
-		}
+		defer wg.Done()
+		r.forwardTokens(ctx, inputTokenCh, synInputCh, outputTokenCh)
 	}()
 
-	go r.consumeTokens(ctx, outputTokenCh)
-	go r.consumeAudios(ctx, outputAudioCh)
+	go func() {
+		defer wg.Done()
+		r.consumeTokens(ctx, outputTokenCh)
+	}()
+
+	go func() {
+		defer wg.Done()
+		r.consumeAudios(ctx, outputAudioCh)
+	}()
+
+	return wg
 }
 
-func (r *Responder) sendError(err error) {
+func (r *Responder) forwardTokens(ctx context.Context,
+	inputTokenCh <-chan core.Token, synInputCh chan<- core.Token, outputTokenCh chan<- core.Token) {
+	defer close(synInputCh)
+	defer close(outputTokenCh)
+
+	for token := range inputTokenCh {
+		if ctx.Err() != nil {
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case synInputCh <- token:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case outputTokenCh <- token:
+		}
+	}
+}
+
+func (r *Responder) sendError(ctx context.Context, err error) {
 	if r.errCh == nil {
 		return
 	}
+
 	select {
 	case r.errCh <- err:
-	default:
+	case <-ctx.Done():
 	}
 }
 
