@@ -20,12 +20,12 @@ type Agent struct {
 	config  AgentConfig
 	options *agentOptions
 
-	ctx         context.Context
-	cancel      context.CancelFunc
-	respAudioCh chan<- AudioFrame
-	respTokenCh chan<- Token
-	respErrCh   chan<- error
-	promptCh    chan<- string
+	ctx          context.Context
+	cancel       context.CancelFunc
+	respAudioChs []chan<- AudioFrame
+	respTokenChs []chan<- Token
+	respErrChs   []chan<- error
+	promptChs    []chan<- string
 
 	responder          *dialog.Responder
 	recognizer         *speech.Recognizer
@@ -50,10 +50,10 @@ func NewAgent(config AgentConfig, opts ...AgentOption) (*Agent, error) {
 		options:     options,
 		ctx:         ctx,
 		cancel:      cancel,
-		respAudioCh: options.respAudioCh,
-		respTokenCh: options.respTokenCh,
-		respErrCh:   options.respErrCh,
-		promptCh:    options.promptCh,
+		respAudioChs: options.respAudioChs,
+		respTokenChs: options.respTokenChs,
+		respErrChs:   options.respErrChs,
+		promptChs:    options.promptChs,
 		lock:        sync.Mutex{},
 		started:     atomic.Bool{},
 		stopped:     atomic.Bool{},
@@ -64,15 +64,16 @@ func (a *Agent) start(ctx context.Context) error {
 	a.responder = dialog.NewResponder(dialog.ResponderConfig{
 		Brain:       a.config.Brain,
 		Synthesizer: a.config.Synthesizer,
-		AudioCh:     a.respAudioCh,
-		TokenCh:     a.respTokenCh,
-		ErrCh:       a.respErrCh,
-		PromptCh:    a.promptCh,
+		AudioChs:  a.respAudioChs,
+		TokenChs:  a.respTokenChs,
+		ErrChs:    a.respErrChs,
+		PromptChs: a.promptChs,
 	})
 
 	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
-		Ctx:       a.ctx,
-		Responder: a.responder,
+		Ctx:                  a.ctx,
+		Responder:            a.responder,
+		MinInterruptDuration: a.options.minInterruptDuration,
 	})
 
 	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{

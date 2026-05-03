@@ -1,10 +1,13 @@
 package voice
 
+import "time"
+
 type agentOptions struct {
-	respAudioCh chan<- AudioFrame
-	respTokenCh chan<- Token
-	respErrCh   chan<- error
-	promptCh    chan<- string
+	respAudioChs         []chan<- AudioFrame
+	respTokenChs         []chan<- Token
+	respErrChs           []chan<- error
+	promptChs            []chan<- string
+	minInterruptDuration time.Duration
 }
 
 type AgentOption interface {
@@ -27,26 +30,32 @@ func buildAgentOptions(opts ...AgentOption) *agentOptions {
 	return options
 }
 
-func SubscribeAudio(respAudioCh chan<- AudioFrame) AgentOption {
+func SubscribeAudio(ch chan<- AudioFrame) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
-		options.respAudioCh = respAudioCh
+		options.respAudioChs = append(options.respAudioChs, ch)
 	})
 }
 
-func SubscribeToken(respTokenCh chan<- Token) AgentOption {
+func SubscribeToken(ch chan<- Token) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
-		options.respTokenCh = respTokenCh
+		options.respTokenChs = append(options.respTokenChs, ch)
 	})
 }
 
-func SubscribeErr(respErrCh chan<- error) AgentOption {
+func SubscribeErr(ch chan<- error) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
-		options.respErrCh = respErrCh
+		options.respErrChs = append(options.respErrChs, ch)
 	})
 }
 
-func SubscribePrompt(promptCh chan<- string) AgentOption {
+func SubscribePrompt(ch chan<- string) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
-		options.promptCh = promptCh
+		options.promptChs = append(options.promptChs, ch)
+	})
+}
+
+func WithMinInterruptDuration(d time.Duration) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.minInterruptDuration = d
 	})
 }

@@ -7,42 +7,60 @@ import (
 	"live-agent-go/voice/internal/speech"
 	"strings"
 	"sync"
+	"time"
 )
 
 type recognitionHandlerConfig struct {
-	Ctx       context.Context
-	Responder *dialog.Responder
+	Ctx                  context.Context
+	Responder            *dialog.Responder
+	MinInterruptDuration time.Duration
 }
 
 type recognitionHandler struct {
 	ctx       context.Context
 	responder *dialog.Responder
 
-	mutex      sync.Mutex
-	cancelResp context.CancelFunc
-	respWg     *sync.WaitGroup
+	minInterruptDuration time.Duration
+
+	mutex          sync.Mutex
+	cancelResp     context.CancelFunc
+	respWg         *sync.WaitGroup
+	interruptTimer *time.Timer
 }
 
 var _ speech.RecognitionHandler = (*recognitionHandler)(nil)
 
 func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler {
 	return &recognitionHandler{
-		ctx:        config.Ctx,
-		responder:  config.Responder,
-		mutex:      sync.Mutex{},
-		cancelResp: nil,
+		ctx:                  config.Ctx,
+		responder:            config.Responder,
+		minInterruptDuration: config.MinInterruptDuration,
 	}
 }
 
 func (r *recognitionHandler) OnSpeechStart() {
-	r.CancelResponse()
+	r.stopInterruptTimer()
+
+	if r.minInterruptDuration <= 0 {
+		r.CancelResponse()
+		return
+	}
+
+	r.mutex.Lock()
+	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, r.CancelResponse)
+	r.mutex.Unlock()
+}
+
+func (r *recognitionHandler) OnSpeechEnd() {
+	r.stopInterruptTimer()
 }
 
 func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
 	prompt := combineTranscripts(transcripts)
 
+	r.stopInterruptTimer()
 	r.CancelResponse()
-	
+
 	ctx := r.createResponseContext()
 	wg := r.responder.Respond(ctx, prompt)
 
@@ -68,6 +86,17 @@ func (r *recognitionHandler) CancelResponse() {
 
 	if wg != nil {
 		wg.Wait()
+	}
+}
+
+func (r *recognitionHandler) stopInterruptTimer() {
+	r.mutex.Lock()
+	t := r.interruptTimer
+	r.interruptTimer = nil
+	r.mutex.Unlock()
+
+	if t != nil {
+		t.Stop()
 	}
 }
 

@@ -10,46 +10,46 @@ type ResponderConfig struct {
 	Brain       Brain
 	Synthesizer Synthesizer
 
-	AudioCh  chan<- core.AudioFrame
-	TokenCh  chan<- core.Token
-	ErrCh    chan<- error
-	PromptCh chan<- string
+	AudioChs  []chan<- core.AudioFrame
+	TokenChs  []chan<- core.Token
+	ErrChs    []chan<- error
+	PromptChs []chan<- string
 }
 
 type Responder struct {
 	brain       Brain
 	synthesizer Synthesizer
 
-	audioCh  chan<- core.AudioFrame
-	tokenCh  chan<- core.Token
-	errCh    chan<- error
-	promptCh chan<- string
+	audioChs  []chan<- core.AudioFrame
+	tokenChs  []chan<- core.Token
+	errChs    []chan<- error
+	promptChs []chan<- string
 }
 
 func NewResponder(config ResponderConfig) *Responder {
 	return &Responder{
 		brain:       config.Brain,
 		synthesizer: config.Synthesizer,
-		audioCh:     config.AudioCh,
-		tokenCh:     config.TokenCh,
-		errCh:       config.ErrCh,
-		promptCh:    config.PromptCh,
+		audioChs:    config.AudioChs,
+		tokenChs:    config.TokenChs,
+		errChs:      config.ErrChs,
+		promptChs:   config.PromptChs,
 	}
 }
 
 func (r *Responder) Respond(ctx context.Context, prompt string) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 
-	if r.promptCh != nil {
+	for _, ch := range r.promptChs {
 		select {
-		case r.promptCh <- prompt:
+		case ch <- prompt:
 		case <-ctx.Done():
 			return wg
 		}
 	}
 
-	synInputCh := make(chan core.Token)
-	outputTokenCh := make(chan core.Token)
+	synInputCh := make(chan core.Token, 32)
+	outputTokenCh := make(chan core.Token, 32)
 
 	inputTokenCh, err := r.brain.Generate(ctx, prompt)
 	if err != nil {
@@ -96,39 +96,39 @@ func (r *Responder) forwardTokens(ctx context.Context,
 		select {
 		case <-ctx.Done():
 			return
-		case synInputCh <- token:
+		case outputTokenCh <- token:
 		}
 
 		select {
-		case <-ctx.Done():
-			return
-		case outputTokenCh <- token:
+		case synInputCh <- token:
+		default:
 		}
 	}
 }
 
 func (r *Responder) sendError(ctx context.Context, err error) {
-	if r.errCh == nil {
-		return
-	}
-
-	select {
-	case r.errCh <- err:
-	case <-ctx.Done():
+	for _, ch := range r.errChs {
+		select {
+		case ch <- err:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
 func (r *Responder) consumeTokens(ctx context.Context, outputTokenCh <-chan core.Token) {
-	if r.tokenCh == nil {
+	if len(r.tokenChs) == 0 {
 		for range outputTokenCh {
 		}
 		return
 	}
 
 	for token := range outputTokenCh {
-		select {
-		case r.tokenCh <- token:
-		case <-ctx.Done():
+		for _, ch := range r.tokenChs {
+			select {
+			case ch <- token:
+			case <-ctx.Done():
+			}
 		}
 
 		if ctx.Err() != nil {
@@ -141,16 +141,20 @@ func (r *Responder) consumeTokens(ctx context.Context, outputTokenCh <-chan core
 }
 
 func (r *Responder) consumeAudios(ctx context.Context, outputAudioCh <-chan core.AudioFrame) {
-	if r.audioCh == nil {
+	if len(r.audioChs) == 0 {
 		for range outputAudioCh {
 		}
 		return
 	}
 
 	for audio := range outputAudioCh {
-		select {
-		case r.audioCh <- audio:
-		case <-ctx.Done():
+		audio.Ctx = ctx
+
+		for _, ch := range r.audioChs {
+			select {
+			case ch <- audio:
+			case <-ctx.Done():
+			}
 		}
 
 		if ctx.Err() != nil {

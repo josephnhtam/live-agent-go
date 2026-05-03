@@ -155,6 +155,7 @@ func (r *Recognizer) handleEvent(ctx context.Context) error {
 					r.handler.OnSpeechStart()
 				} else if v == VADEventSpeechEnd {
 					isSpeaking = false
+					r.handler.OnSpeechEnd()
 
 					if !isTranscribing && len(transcripts) > 0 {
 						r.handler.OnSpeechRecognized(transcripts)
