@@ -1,4 +1,4 @@
-package transport
+package webrtc
 
 import "time"
 
@@ -15,5 +15,5 @@ const (
 	PCMEncoderChannels = 1
 	PCMBufferSize      = OpusClockRate * OpusMaxFrameDurationMs / 1000
 
-	TextDataChannelName = "text"
+	OpusFrameSamples = OpusClockRate * int(OpusFrameDuration/time.Millisecond) / 1000
 )

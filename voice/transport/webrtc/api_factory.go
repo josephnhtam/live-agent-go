@@ -1,4 +1,4 @@
-package transport
+package webrtc
 
 import (
 	"errors"
@@ -6,23 +6,26 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-type WebRTCAPIFactory interface {
+type APIFactory interface {
 	Create() (*webrtc.API, error)
 }
 
-type DefaultWebRTCAPIFactory struct {
-	options *webRTCAPIOptions
+type DefaultAPIFactory struct {
+	options *APIOptions
 }
 
-func NewDefaultWebRTCAPIFactory(opts ...WebRTCAPIOption) *DefaultWebRTCAPIFactory {
-	options := buildWebRTCAPIOptions(opts...)
+func NewDefaultAPIFactory(opts ...*APIOptions) *DefaultAPIFactory {
+	options := NewAPIOptions()
+	if len(opts) > 0 && opts[0] != nil {
+		options = opts[0]
+	}
 
-	return &DefaultWebRTCAPIFactory{
+	return &DefaultAPIFactory{
 		options: options,
 	}
 }
 
-func (f *DefaultWebRTCAPIFactory) Create() (*webrtc.API, error) {
+func (f *DefaultAPIFactory) Create() (*webrtc.API, error) {
 	mediaEngine := &webrtc.MediaEngine{}
 
 	err := mediaEngine.RegisterCodec(webrtc.RTPCodecParameters{
