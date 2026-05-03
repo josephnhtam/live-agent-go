@@ -42,10 +42,6 @@ func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler 
 }
 
 func (r *recognitionHandler) OnSpeechStart() {
-	if !r.interruptOnInterim {
-		return
-	}
-
 	r.stopInterruptTimer()
 
 	if r.minInterruptDuration <= 0 {
@@ -56,6 +52,14 @@ func (r *recognitionHandler) OnSpeechStart() {
 	r.mutex.Lock()
 	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, r.CancelResponse)
 	r.mutex.Unlock()
+}
+
+func (r *recognitionHandler) OnInterim() {
+	if !r.interruptOnInterim {
+		return
+	}
+
+	r.CancelResponse()
 }
 
 func (r *recognitionHandler) OnSpeechEnd() {

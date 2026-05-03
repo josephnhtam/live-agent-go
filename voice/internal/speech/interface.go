@@ -8,6 +8,7 @@ import (
 type RecognitionHandler interface {
 	OnSpeechStart()
 	OnSpeechEnd()
+	OnInterim()
 	OnSpeechRecognized(transcripts []core.Transcript)
 }
 

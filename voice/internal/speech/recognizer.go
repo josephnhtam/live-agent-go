@@ -3,8 +3,9 @@ package speech
 import (
 	"context"
 	"errors"
-	"golang.org/x/sync/errgroup"
 	"live-agent-go/voice/core"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const bufferSize = 8
@@ -172,24 +173,25 @@ func (r *Recognizer) handleEvent(ctx context.Context) error {
 					}
 				}
 
-		case core.Transcript:
-			if v.IsFinal {
-				transcripts = append(transcripts, v)
-				isTranscribing = false
+			case core.Transcript:
+				if v.IsFinal {
+					transcripts = append(transcripts, v)
+					isTranscribing = false
 
-				if r.vad == nil || !isSpeaking {
-					if len(transcripts) > 0 {
-						r.handler.OnSpeechEnd()
-						r.handler.OnSpeechRecognized(transcripts)
-						transcripts = nil
+					if r.vad == nil || !isSpeaking {
+						if len(transcripts) > 0 {
+							r.handler.OnSpeechEnd()
+							r.handler.OnSpeechRecognized(transcripts)
+							transcripts = nil
+						}
 					}
+				} else {
+					if !isTranscribing {
+						r.handler.OnInterim()
+					}
+
+					isTranscribing = true
 				}
-			} else {
-				if r.vad == nil && !isTranscribing {
-					r.handler.OnSpeechStart()
-				}
-				isTranscribing = true
-			}
 			}
 		}
 	}
