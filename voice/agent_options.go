@@ -9,6 +9,12 @@ type agentOptions struct {
 	respErrChs           []chan<- error
 	promptChs            []chan<- string
 	minInterruptDuration time.Duration
+	interruptOnInterim   bool
+}
+
+var defaultAgentOptions = agentOptions{
+	minInterruptDuration: 300 * time.Millisecond,
+	interruptOnInterim:   true,
 }
 
 type AgentOption interface {
@@ -22,7 +28,8 @@ func (f AgentOptionFunc) apply(options *agentOptions) {
 }
 
 func buildAgentOptions(opts ...AgentOption) *agentOptions {
-	options := &agentOptions{}
+	defaultOptions := defaultAgentOptions
+	options := &defaultOptions
 
 	for _, opt := range opts {
 		opt.apply(options)
@@ -64,5 +71,11 @@ func WithVAD(vad VAD) AgentOption {
 func WithMinInterruptDuration(d time.Duration) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.minInterruptDuration = d
+	})
+}
+
+func WithInterruptOnInterim(enabled bool) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.interruptOnInterim = enabled
 	})
 }

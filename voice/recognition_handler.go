@@ -14,6 +14,7 @@ type recognitionHandlerConfig struct {
 	Ctx                  context.Context
 	Responder            *dialog.Responder
 	MinInterruptDuration time.Duration
+	InterruptOnInterim   bool
 }
 
 type recognitionHandler struct {
@@ -21,6 +22,7 @@ type recognitionHandler struct {
 	responder *dialog.Responder
 
 	minInterruptDuration time.Duration
+	interruptOnInterim   bool
 
 	mutex          sync.Mutex
 	cancelResp     context.CancelFunc
@@ -35,10 +37,15 @@ func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler 
 		ctx:                  config.Ctx,
 		responder:            config.Responder,
 		minInterruptDuration: config.MinInterruptDuration,
+		interruptOnInterim:   config.InterruptOnInterim,
 	}
 }
 
 func (r *recognitionHandler) OnSpeechStart() {
+	if !r.interruptOnInterim {
+		return
+	}
+
 	r.stopInterruptTimer()
 
 	if r.minInterruptDuration <= 0 {

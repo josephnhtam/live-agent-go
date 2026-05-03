@@ -73,6 +73,7 @@ func (a *Agent) start(ctx context.Context) error {
 		Ctx:                  a.ctx,
 		Responder:            a.responder,
 		MinInterruptDuration: a.options.minInterruptDuration,
+		InterruptOnInterim:   a.options.interruptOnInterim,
 	})
 
 	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{
