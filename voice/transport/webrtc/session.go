@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"live-agent-go/voice/core"
+	"live-agent-go/voice/helper"
 	"live-agent-go/voice/transport/types"
 	"log/slog"
 	"sync"
@@ -76,13 +77,17 @@ func newSession(
 		return nil, errors.Join(ErrCreateOpusEncoder, err)
 	}
 
+	if logger == nil {
+		logger = helper.NoopLogger()
+	}
+
 	s := &Session{
 		pc:                 pc,
 		audioIn:            make(chan core.AudioFrame, audioBufferSize),
 		messageIn:          make(chan string, messageBufferSize),
 		ctx:                ctx,
 		cancel:             cancel,
-		logger:             logger,
+		logger:             logger.WithGroup("webrtc_session"),
 		outTrack:           outTrack,
 		encoder:            encoder,
 		outBuf:             make([]int16, OpusFrameSamples),
