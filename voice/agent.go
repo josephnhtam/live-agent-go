@@ -10,7 +10,6 @@ import (
 )
 
 type AgentConfig struct {
-	VAD         VAD
 	Transcriber Transcriber
 	Synthesizer Synthesizer
 	Brain       Brain
@@ -77,7 +76,7 @@ func (a *Agent) start(ctx context.Context) error {
 	})
 
 	a.recognizer = speech.NewRecognizer(speech.RecognizerConfig{
-		VAD:         a.config.VAD,
+		VAD:         a.options.vad,
 		Transcriber: a.config.Transcriber,
 		Handler:     a.recognitionHandler,
 	})
@@ -161,10 +160,6 @@ func (a *Agent) Stop(ctx context.Context) error {
 }
 
 func validateAgentConfig(config AgentConfig) error {
-	if config.VAD == nil {
-		return ErrInvalidVAD
-	}
-
 	if config.Transcriber == nil {
 		return ErrInvalidTranscriber
 	}

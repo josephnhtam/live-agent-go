@@ -3,6 +3,7 @@ package voice
 import "time"
 
 type agentOptions struct {
+	vad                  VAD
 	respAudioChs         []chan<- AudioFrame
 	respTokenChs         []chan<- Token
 	respErrChs           []chan<- error
@@ -51,6 +52,12 @@ func SubscribeErr(ch chan<- error) AgentOption {
 func SubscribePrompt(ch chan<- string) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.promptChs = append(options.promptChs, ch)
+	})
+}
+
+func WithVAD(vad VAD) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.vad = vad
 	})
 }
 

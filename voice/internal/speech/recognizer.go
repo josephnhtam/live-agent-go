@@ -43,8 +43,10 @@ func NewRecognizer(config RecognizerConfig) *Recognizer {
 }
 
 func (r *Recognizer) Start(ctx context.Context) error {
-	if err := r.vad.Start(ctx); err != nil {
-		return errors.Join(ErrStartingVAD, err)
+	if r.vad != nil {
+		if err := r.vad.Start(ctx); err != nil {
+			return errors.Join(ErrStartingVAD, err)
+		}
 	}
 
 	if err := r.transcriber.Start(ctx); err != nil {
@@ -54,7 +56,10 @@ func (r *Recognizer) Start(ctx context.Context) error {
 	r.grp, ctx = errgroup.WithContext(r.ctx)
 
 	r.grp.Go(func() error {
-		vadCh := r.vad.Event()
+		var vadCh <-chan VADEvent
+		if r.vad != nil {
+			vadCh = r.vad.Event()
+		}
 		transcribeCh := r.transcriber.Transcribe()
 
 		for {
@@ -107,7 +112,9 @@ func (r *Recognizer) Stop(ctx context.Context) error {
 	r.cancel()
 
 	var errs []error
-	errs = append(errs, r.vad.Stop(ctx))
+	if r.vad != nil {
+		errs = append(errs, r.vad.Stop(ctx))
+	}
 	errs = append(errs, r.transcriber.Stop(ctx))
 
 	waitCh := make(chan error, 1)
@@ -126,8 +133,10 @@ func (r *Recognizer) Stop(ctx context.Context) error {
 }
 
 func (r *Recognizer) Feed(ctx context.Context, frame core.AudioFrame) error {
-	if err := r.vad.Feed(ctx, frame); err != nil {
-		return errors.Join(ErrFeedingVAD, err)
+	if r.vad != nil {
+		if err := r.vad.Feed(ctx, frame); err != nil {
+			return errors.Join(ErrFeedingVAD, err)
+		}
 	}
 
 	if err := r.transcriber.Feed(ctx, frame); err != nil {
@@ -163,18 +172,24 @@ func (r *Recognizer) handleEvent(ctx context.Context) error {
 					}
 				}
 
-			case core.Transcript:
-				if v.IsFinal {
-					transcripts = append(transcripts, v)
-					isTranscribing = false
+		case core.Transcript:
+			if v.IsFinal {
+				transcripts = append(transcripts, v)
+				isTranscribing = false
 
-					if !isSpeaking && len(transcripts) > 0 {
+				if r.vad == nil || !isSpeaking {
+					if len(transcripts) > 0 {
+						r.handler.OnSpeechEnd()
 						r.handler.OnSpeechRecognized(transcripts)
 						transcripts = nil
 					}
-				} else {
-					isTranscribing = true
 				}
+			} else {
+				if r.vad == nil && !isTranscribing {
+					r.handler.OnSpeechStart()
+				}
+				isTranscribing = true
+			}
 			}
 		}
 	}
