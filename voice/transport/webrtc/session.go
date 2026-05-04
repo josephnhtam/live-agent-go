@@ -114,22 +114,22 @@ func (s *Session) MessageReady() <-chan struct{} {
 	return s.messageReady
 }
 
-func (s *Session) SendAudio(frame core.AudioFrame) error {
+func (s *Session) SendAudio(frame core.AudioFrame, pacing bool) error {
 	if s.ctx.Err() != nil {
 		return ErrSessionClosed
 	}
 
 	switch f := frame.(type) {
 	case *core.OpusFrame:
-		return s.sendOpusFrame(f)
+		return s.sendOpusFrame(f, pacing)
 	case *core.PCMFrame:
-		return s.sendPCMFrame(f)
+		return s.sendPCMFrame(f, pacing)
 	default:
 		return ErrUnsupportedFrameType
 	}
 }
 
-func (s *Session) sendPCMFrame(frame *core.PCMFrame) error {
+func (s *Session) sendPCMFrame(frame *core.PCMFrame, pacing bool) error {
 	data := frame.PCMData
 
 	if frame.SampleRate() != OpusClockRate {
@@ -151,7 +151,7 @@ func (s *Session) sendPCMFrame(frame *core.PCMFrame) error {
 		offset += n
 
 		if s.outBufLen == OpusFrameSamples {
-			if err := s.encodeAndSend(); err != nil {
+			if err := s.encodeAndSend(pacing); err != nil {
 				return err
 			}
 		}
@@ -160,8 +160,10 @@ func (s *Session) sendPCMFrame(frame *core.PCMFrame) error {
 	return nil
 }
 
-func (s *Session) sendOpusFrame(frame *core.OpusFrame) error {
-	<-s.outTicker.C
+func (s *Session) sendOpusFrame(frame *core.OpusFrame, pacing bool) error {
+	if pacing {
+		<-s.outTicker.C
+	}
 
 	return s.outTrack.WriteSample(media.Sample{
 		Data:     frame.OpusData,
@@ -169,7 +171,7 @@ func (s *Session) sendOpusFrame(frame *core.OpusFrame) error {
 	})
 }
 
-func (s *Session) encodeAndSend() error {
+func (s *Session) encodeAndSend(pacing bool) error {
 	encoded := make([]byte, OpusMaxEncodedFrameSize)
 
 	n, err := s.encoder.Encode(s.outBuf, encoded)
@@ -180,7 +182,9 @@ func (s *Session) encodeAndSend() error {
 
 	s.outBufLen = 0
 
-	<-s.outTicker.C
+	if pacing {
+		<-s.outTicker.C
+	}
 
 	return s.outTrack.WriteSample(media.Sample{
 		Data:     encoded[:n],

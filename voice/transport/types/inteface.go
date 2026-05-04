@@ -6,7 +6,7 @@ type Session interface {
 	AudioIn() <-chan core.AudioFrame
 	MessageIn() <-chan string
 	MessageReady() <-chan struct{}
-	SendAudio(frame core.AudioFrame) error
+	SendAudio(frame core.AudioFrame, pacing bool) error
 	SendMessage(text string) error
 	Done() <-chan struct{}
 	Close() error

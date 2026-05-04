@@ -183,7 +183,7 @@ func (a *SessionAgent) outboundAudioLoop(ctx context.Context) error {
 				continue
 			}
 
-			if err := a.session.SendAudio(frame); err != nil {
+			if err := a.session.SendAudio(frame, true); err != nil {
 				if errors.Is(err, transport.ErrSessionClosed) {
 					return err
 				}
