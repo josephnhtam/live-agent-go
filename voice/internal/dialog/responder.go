@@ -235,7 +235,7 @@ func (r *Responder) consumeAudios(ctx context.Context, audioOut <-chan core.Audi
 	}
 
 	for audio := range audioOut {
-		audio.Ctx = ctx
+		audio.SetContext(ctx)
 
 		for _, ch := range r.audioChs {
 			select {

@@ -45,7 +45,7 @@ func (m *Manager) AcceptOffer(ctx context.Context, offerSDP string) (string, typ
 		}
 	}()
 
-	session, err = newSession(pc, m.options.messageChannelName, m.options.pcmChannelBufferSize, m.options.messageBufferSize, m.options.logger)
+	session, err = newSession(pc, m.options)
 	if err != nil {
 		return "", nil, err
 	}

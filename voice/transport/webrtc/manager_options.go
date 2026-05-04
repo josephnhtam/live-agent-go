@@ -6,18 +6,26 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+type AudioInEncoding int
+
+const (
+	AudioInEncodingPCM  AudioInEncoding = iota
+	AudioInEncodingOpus
+)
+
 type ManagerOptions struct {
-	iceServers           []webrtc.ICEServer
-	pcmChannelBufferSize int
-	messageBufferSize    int
-	messageChannelName   string
-	logger               *slog.Logger
+	iceServers         []webrtc.ICEServer
+	audioBufferSize    int
+	messageBufferSize  int
+	messageChannelName string
+	audioInEncoding    AudioInEncoding
+	logger             *slog.Logger
 }
 
 func NewManagerOptions() *ManagerOptions {
 	return &ManagerOptions{
-		pcmChannelBufferSize: 128,
-		messageBufferSize:    16,
+		audioBufferSize:   128,
+		messageBufferSize: 16,
 	}
 }
 
@@ -26,8 +34,8 @@ func (o *ManagerOptions) WithICEServers(servers []webrtc.ICEServer) *ManagerOpti
 	return o
 }
 
-func (o *ManagerOptions) WithPCMChannelBufferSize(size int) *ManagerOptions {
-	o.pcmChannelBufferSize = size
+func (o *ManagerOptions) WithAudioBufferSize(size int) *ManagerOptions {
+	o.audioBufferSize = size
 	return o
 }
 
@@ -38,6 +46,11 @@ func (o *ManagerOptions) WithMessageChannelBufferSize(size int) *ManagerOptions 
 
 func (o *ManagerOptions) WithMessageChannel(name string) *ManagerOptions {
 	o.messageChannelName = name
+	return o
+}
+
+func (o *ManagerOptions) WithAudioInEncoding(encoding AudioInEncoding) *ManagerOptions {
+	o.audioInEncoding = encoding
 	return o
 }
 

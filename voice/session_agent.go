@@ -180,7 +180,7 @@ func (a *SessionAgent) outboundAudioLoop(ctx context.Context) error {
 				return nil
 			}
 
-			if frame.Ctx != nil && frame.Ctx.Err() != nil {
+			if frame.Context() != nil && frame.Context().Err() != nil {
 				continue
 			}
 

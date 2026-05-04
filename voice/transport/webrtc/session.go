@@ -32,6 +32,7 @@ type Session struct {
 	outBufLen          int
 	outTicker          *time.Ticker
 	resampleLastSample int16
+	audioInEncoding    AudioInEncoding
 	messageChannelName string
 	dc                 *webrtc.DataChannel
 	messageReady       chan struct{}
@@ -41,10 +42,7 @@ var _ types.Session = (*Session)(nil)
 
 func newSession(
 	pc *webrtc.PeerConnection,
-	messageChannelName string,
-	audioBufferSize int,
-	messageBufferSize int,
-	logger *slog.Logger,
+	options *ManagerOptions,
 ) (*Session, error) {
 	success := false
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,22 +76,23 @@ func newSession(
 		return nil, errors.Join(ErrCreateOpusEncoder, err)
 	}
 
-	if logger == nil {
-		logger = helper.NoopLogger()
+	if options.logger == nil {
+		options.logger = helper.NoopLogger()
 	}
 
 	s := &Session{
 		pc:                 pc,
-		audioIn:            make(chan core.AudioFrame, audioBufferSize),
-		messageIn:          make(chan string, messageBufferSize),
+		audioIn:            make(chan core.AudioFrame, options.audioBufferSize),
+		messageIn:          make(chan string, options.messageBufferSize),
 		ctx:                ctx,
 		cancel:             cancel,
-		logger:             logger.WithGroup("webrtc_session"),
+		logger:             options.logger.WithGroup("webrtc_session"),
 		outTrack:           outTrack,
 		encoder:            encoder,
 		outBuf:             make([]int16, OpusFrameSamples),
 		outTicker:          time.NewTicker(OpusFrameDuration),
-		messageChannelName: messageChannelName,
+		audioInEncoding:    options.audioInEncoding,
+		messageChannelName: options.messageChannelName,
 		messageReady:       make(chan struct{}),
 	}
 
@@ -120,10 +119,21 @@ func (s *Session) SendAudio(frame core.AudioFrame) error {
 		return ErrSessionClosed
 	}
 
-	data := frame.Data
+	switch f := frame.(type) {
+	case *core.OpusFrame:
+		return s.sendOpusFrame(f)
+	case *core.PCMFrame:
+		return s.sendPCMFrame(f)
+	default:
+		return ErrUnsupportedFrameType
+	}
+}
 
-	if frame.SampleRate != OpusClockRate {
-		data = helper.ResampleLinear(data, frame.SampleRate, OpusClockRate, &s.resampleLastSample)
+func (s *Session) sendPCMFrame(frame *core.PCMFrame) error {
+	data := frame.PCMData
+
+	if frame.SampleRate() != OpusClockRate {
+		data = helper.ResampleLinear(data, frame.SampleRate(), OpusClockRate, &s.resampleLastSample)
 	}
 
 	offset := 0
@@ -148,6 +158,15 @@ func (s *Session) SendAudio(frame core.AudioFrame) error {
 	}
 
 	return nil
+}
+
+func (s *Session) sendOpusFrame(frame *core.OpusFrame) error {
+	<-s.outTicker.C
+
+	return s.outTrack.WriteSample(media.Sample{
+		Data:     frame.OpusData,
+		Duration: OpusFrameDuration,
+	})
 }
 
 func (s *Session) encodeAndSend() error {
@@ -258,6 +277,15 @@ func (s *Session) setupDataChannelCallbacks(dc *webrtc.DataChannel) {
 func (s *Session) handleAudioTrack(track *webrtc.TrackRemote) {
 	defer s.trackWg.Done()
 
+	switch s.audioInEncoding {
+	case AudioInEncodingOpus:
+		s.handleAudioTrackOpus(track)
+	default:
+		s.handleAudioTrackPCM(track)
+	}
+}
+
+func (s *Session) handleAudioTrackPCM(track *webrtc.TrackRemote) {
 	decoder, err := opus.NewDecoder(OpusClockRate, PCMDecoderChannels)
 	if err != nil {
 		s.logger.Error("failed to create Opus decoder", "error", err)
@@ -288,10 +316,10 @@ func (s *Session) handleAudioTrack(track *webrtc.TrackRemote) {
 		pcmData := make([]int16, n)
 		copy(pcmData, pcmBuffer[:n])
 
-		frame := core.AudioFrame{
-			Data:       pcmData,
-			SampleRate: OpusClockRate,
-			Channels:   PCMDecoderChannels,
+		frame := &core.PCMFrame{
+			PCMData:      pcmData,
+			SampleRateHz: OpusClockRate,
+			NumChannels:  PCMDecoderChannels,
 		}
 
 		select {
@@ -304,3 +332,35 @@ func (s *Session) handleAudioTrack(track *webrtc.TrackRemote) {
 	}
 }
 
+func (s *Session) handleAudioTrackOpus(track *webrtc.TrackRemote) {
+	for {
+		rtpPacket, _, err := track.ReadRTP()
+		if err != nil {
+			if err != io.EOF {
+				s.logger.Error("error reading RTP", "error", err)
+			}
+			return
+		}
+
+		if len(rtpPacket.Payload) == 0 {
+			continue
+		}
+
+		opusData := make([]byte, len(rtpPacket.Payload))
+		copy(opusData, rtpPacket.Payload)
+
+		frame := &core.OpusFrame{
+			OpusData:     opusData,
+			SampleRateHz: OpusClockRate,
+			NumChannels:  OpusChannels,
+		}
+
+		select {
+		case s.audioIn <- frame:
+		case <-s.ctx.Done():
+			return
+		default:
+			s.logger.Warn("audio input channel full, dropping audio frame")
+		}
+	}
+}

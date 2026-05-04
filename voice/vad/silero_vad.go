@@ -80,15 +80,20 @@ func (v *SileroVAD) Feed(ctx context.Context, frame core.AudioFrame) error {
 		return ErrVADNotStarted
 	}
 
-	if frame.SampleRate < sampleRate || int(frame.SampleRate)%sampleRate != 0 {
+	pcmFrame, ok := frame.(*core.PCMFrame)
+	if !ok {
+		return ErrUnsupportedFrameType
+	}
+
+	if frame.SampleRate() < sampleRate || int(frame.SampleRate())%sampleRate != 0 {
 		return ErrUnsupportedSampleRate
 	}
 
-	if frame.Channels != 1 {
+	if frame.Channels() != 1 {
 		return ErrUnsupportedChannels
 	}
 
-	samples := convertAndResample(frame)
+	samples := convertAndResample(pcmFrame)
 
 	offset := 0
 	for offset < len(samples) {
@@ -144,9 +149,9 @@ func (v *SileroVAD) emit(ctx context.Context, event speech.VADEvent) {
 	}
 }
 
-func convertAndResample(frame core.AudioFrame) []float32 {
-	data := frame.Data
-	ratio := int(frame.SampleRate) / sampleRate
+func convertAndResample(frame *core.PCMFrame) []float32 {
+	data := frame.PCMData
+	ratio := int(frame.SampleRateHz) / sampleRate
 
 	if ratio <= 1 {
 		out := make([]float32, len(data))

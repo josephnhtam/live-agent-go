@@ -6,6 +6,8 @@ import (
 )
 
 type AudioFrame = core.AudioFrame
+type PCMFrame = core.PCMFrame
+type OpusFrame = core.OpusFrame
 type Transcript = core.Transcript
 type Token = core.Token
 
