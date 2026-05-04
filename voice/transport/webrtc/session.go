@@ -30,7 +30,7 @@ type Session struct {
 	encoder            *opus.Encoder
 	outBuf             []int16
 	outBufLen          int
-	outTicker          *time.Ticker
+	nextSendTime       time.Time
 	resampleLastSample int16
 	audioInEncoding    AudioInEncoding
 	messageChannelName string
@@ -90,7 +90,6 @@ func newSession(
 		outTrack:           outTrack,
 		encoder:            encoder,
 		outBuf:             make([]int16, OpusFrameSamples),
-		outTicker:          time.NewTicker(OpusFrameDuration),
 		audioInEncoding:    options.audioInEncoding,
 		messageChannelName: options.messageChannelName,
 		messageReady:       make(chan struct{}),
@@ -160,9 +159,17 @@ func (s *Session) sendPCMFrame(frame *core.PCMFrame, pacing bool) error {
 	return nil
 }
 
+func (s *Session) paceWrite() {
+	now := time.Now()
+	if !s.nextSendTime.IsZero() && now.Before(s.nextSendTime) {
+		time.Sleep(s.nextSendTime.Sub(now))
+	}
+	s.nextSendTime = time.Now().Add(OpusFrameDuration)
+}
+
 func (s *Session) sendOpusFrame(frame *core.OpusFrame, pacing bool) error {
 	if pacing {
-		<-s.outTicker.C
+		s.paceWrite()
 	}
 
 	return s.outTrack.WriteSample(media.Sample{
@@ -183,7 +190,7 @@ func (s *Session) encodeAndSend(pacing bool) error {
 	s.outBufLen = 0
 
 	if pacing {
-		<-s.outTicker.C
+		s.paceWrite()
 	}
 
 	return s.outTrack.WriteSample(media.Sample{
@@ -217,7 +224,6 @@ func (s *Session) Close() error {
 
 		close(s.audioIn)
 		close(s.messageIn)
-		s.outTicker.Stop()
 
 		pcErr = s.pc.Close()
 	})
