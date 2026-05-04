@@ -9,8 +9,7 @@ type agentOptions struct {
 	respErrChs           []chan<- error
 	promptChs            []chan<- string
 	minInterruptDuration time.Duration
-	interruptOnInterim   bool
-	iceBreaking          bool
+	interruptOnInterim bool
 
 	brainBufferSize       int
 	synthesizerBufferSize int
@@ -83,12 +82,6 @@ func WithMinInterruptDuration(d time.Duration) AgentOption {
 func WithInterruptOnInterim(enabled bool) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.interruptOnInterim = enabled
-	})
-}
-
-func WithIceBreaking() AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.iceBreaking = true
 	})
 }
 

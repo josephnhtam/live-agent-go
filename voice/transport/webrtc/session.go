@@ -34,6 +34,7 @@ type Session struct {
 	resampleLastSample int16
 	messageChannelName string
 	dc                 *webrtc.DataChannel
+	messageReady       chan struct{}
 }
 
 var _ types.Session = (*Session)(nil)
@@ -93,6 +94,7 @@ func newSession(
 		outBuf:             make([]int16, OpusFrameSamples),
 		outTicker:          time.NewTicker(OpusFrameDuration),
 		messageChannelName: messageChannelName,
+		messageReady:       make(chan struct{}),
 	}
 
 	s.setupCallbacks()
@@ -109,8 +111,8 @@ func (s *Session) MessageIn() <-chan string {
 	return s.messageIn
 }
 
-func (s *Session) MessageReady() bool {
-	return s.dc != nil
+func (s *Session) MessageReady() <-chan struct{} {
+	return s.messageReady
 }
 
 func (s *Session) SendAudio(frame core.AudioFrame) error {
@@ -232,6 +234,7 @@ func (s *Session) setupCallbacks() {
 func (s *Session) setupDataChannelCallbacks(dc *webrtc.DataChannel) {
 	dc.OnOpen(func() {
 		s.dc = dc
+		close(s.messageReady)
 		s.logger.Info("data channel opened")
 	})
 

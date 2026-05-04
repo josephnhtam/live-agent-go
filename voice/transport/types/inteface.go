@@ -5,7 +5,7 @@ import "live-agent-go/voice/core"
 type Session interface {
 	AudioIn() <-chan core.AudioFrame
 	MessageIn() <-chan string
-	MessageReady() bool
+	MessageReady() <-chan struct{}
 	SendAudio(frame core.AudioFrame) error
 	SendMessage(text string) error
 	Done() <-chan struct{}

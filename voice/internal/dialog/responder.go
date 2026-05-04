@@ -64,7 +64,7 @@ func bufferSize(size, fallback int) int {
 	return size
 }
 
-func (r *Responder) Initiate() {
+func (r *Responder) IceBreaking() {
 	r.CancelResponse()
 
 	ctx := r.createResponseContext()

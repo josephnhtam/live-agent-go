@@ -103,11 +103,11 @@ func (a *Agent) start(ctx context.Context) error {
 		}
 	}()
 
-	if a.options.iceBreaking {
-		a.responder.Initiate()
-	}
-
 	return nil
+}
+
+func (a *Agent) IceBreaking() {
+	a.responder.IceBreaking()
 }
 
 func (a *Agent) Done() <-chan error {
