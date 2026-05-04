@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"live-agent-go/voice/helper"
 	"live-agent-go/voice/transport"
@@ -51,7 +50,7 @@ type SessionAgent struct {
 	options  *sessionAgentOptions
 	audioCh  <-chan AudioFrame
 	tokenCh  <-chan Token
-	promptCh <-chan string
+	promptCh <-chan Prompt
 	logger   *slog.Logger
 }
 
@@ -67,7 +66,7 @@ func NewSessionAgent(session types.Session, config SessionAgentConfig, opts ...S
 	agentOpts = append(agentOpts, config.AgentOptions...)
 
 	tokenCh := make(chan Token, 32)
-	promptCh := make(chan string, 32)
+	promptCh := make(chan Prompt, 32)
 
 	agentOpts = append(agentOpts,
 		SubscribeToken(tokenCh),
@@ -244,7 +243,7 @@ func (a *SessionAgent) outboundPromptLoop(ctx context.Context) error {
 				return nil
 			}
 
-			text, err := a.options.messageSerializer.Serialize(Message{MessageID: uuid.NewString(), Role: MessageRoleUser, Text: prompt})
+			text, err := a.options.messageSerializer.Serialize(Message{MessageID: prompt.MessageID, Role: MessageRoleUser, Text: prompt.Text})
 			if err != nil {
 				a.logger.Warn("error serializing prompt message", "error", err)
 				continue

@@ -5,6 +5,8 @@ import (
 	"live-agent-go/voice/core"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 type ResponderConfig struct {
@@ -19,7 +21,7 @@ type ResponderConfig struct {
 	AudioChs  []chan<- core.AudioFrame
 	TokenChs  []chan<- core.Token
 	ErrChs    []chan<- error
-	PromptChs []chan<- string
+	PromptChs []chan<- core.Prompt
 }
 
 type Responder struct {
@@ -34,7 +36,7 @@ type Responder struct {
 	audioChs  []chan<- core.AudioFrame
 	tokenChs  []chan<- core.Token
 	errChs    []chan<- error
-	promptChs []chan<- string
+	promptChs []chan<- core.Prompt
 
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
@@ -88,7 +90,7 @@ func (r *Responder) Respond(prompt string) {
 
 	for _, ch := range r.promptChs {
 		select {
-		case ch <- prompt:
+		case ch <- core.Prompt{MessageID: uuid.NewString(), Text: prompt}:
 		case <-ctx.Done():
 			return
 		}

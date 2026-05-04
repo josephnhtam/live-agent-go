@@ -7,7 +7,7 @@ type agentOptions struct {
 	respAudioChs         []chan<- AudioFrame
 	respTokenChs         []chan<- Token
 	respErrChs           []chan<- error
-	promptChs            []chan<- string
+	promptChs            []chan<- Prompt
 	minInterruptDuration time.Duration
 	interruptOnInterim bool
 
@@ -61,7 +61,7 @@ func SubscribeErr(ch chan<- error) AgentOption {
 	})
 }
 
-func SubscribePrompt(ch chan<- string) AgentOption {
+func SubscribePrompt(ch chan<- Prompt) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.promptChs = append(options.promptChs, ch)
 	})

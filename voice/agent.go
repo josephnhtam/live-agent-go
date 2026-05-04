@@ -24,7 +24,7 @@ type Agent struct {
 	respAudioChs []chan<- AudioFrame
 	respTokenChs []chan<- Token
 	respErrChs   []chan<- error
-	promptChs    []chan<- string
+	promptChs    []chan<- Prompt
 
 	responder          *dialog.Responder
 	recognizer         *speech.Recognizer
