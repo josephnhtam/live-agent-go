@@ -1,7 +1,6 @@
 package voice
 
 import (
-	"context"
 	"live-agent-go/voice/core"
 	"live-agent-go/voice/internal/dialog"
 	"live-agent-go/voice/internal/speech"
@@ -11,22 +10,18 @@ import (
 )
 
 type recognitionHandlerConfig struct {
-	Ctx                  context.Context
 	Responder            *dialog.Responder
 	MinInterruptDuration time.Duration
 	InterruptOnInterim   bool
 }
 
 type recognitionHandler struct {
-	ctx       context.Context
 	responder *dialog.Responder
 
 	minInterruptDuration time.Duration
 	interruptOnInterim   bool
 
 	mutex          sync.Mutex
-	cancelResp     context.CancelFunc
-	respWg         *sync.WaitGroup
 	interruptTimer *time.Timer
 }
 
@@ -34,7 +29,6 @@ var _ speech.RecognitionHandler = (*recognitionHandler)(nil)
 
 func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler {
 	return &recognitionHandler{
-		ctx:                  config.Ctx,
 		responder:            config.Responder,
 		minInterruptDuration: config.MinInterruptDuration,
 		interruptOnInterim:   config.InterruptOnInterim,
@@ -45,12 +39,12 @@ func (r *recognitionHandler) OnSpeechStart() {
 	r.stopInterruptTimer()
 
 	if r.minInterruptDuration <= 0 {
-		r.CancelResponse()
+		r.responder.CancelResponse()
 		return
 	}
 
 	r.mutex.Lock()
-	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, r.CancelResponse)
+	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, r.responder.CancelResponse)
 	r.mutex.Unlock()
 }
 
@@ -59,7 +53,7 @@ func (r *recognitionHandler) OnInterim() {
 		return
 	}
 
-	r.CancelResponse()
+	r.responder.CancelResponse()
 }
 
 func (r *recognitionHandler) OnSpeechEnd() {
@@ -70,34 +64,7 @@ func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
 	prompt := combineTranscripts(transcripts)
 
 	r.stopInterruptTimer()
-	r.CancelResponse()
-
-	ctx := r.createResponseContext()
-	wg := r.responder.Respond(ctx, prompt)
-
-	r.mutex.Lock()
-	r.respWg = wg
-	r.mutex.Unlock()
-}
-
-func (r *recognitionHandler) CancelResponse() {
-	r.mutex.Lock()
-
-	cancel := r.cancelResp
-	wg := r.respWg
-
-	r.cancelResp = nil
-	r.respWg = nil
-
-	r.mutex.Unlock()
-
-	if cancel != nil {
-		cancel()
-	}
-
-	if wg != nil {
-		wg.Wait()
-	}
+	r.responder.Respond(prompt)
 }
 
 func (r *recognitionHandler) stopInterruptTimer() {
@@ -109,14 +76,6 @@ func (r *recognitionHandler) stopInterruptTimer() {
 	if t != nil {
 		t.Stop()
 	}
-}
-
-func (r *recognitionHandler) createResponseContext() (ctx context.Context) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	ctx, r.cancelResp = context.WithCancel(r.ctx)
-	return
 }
 
 func combineTranscripts(transcripts []core.Transcript) string {

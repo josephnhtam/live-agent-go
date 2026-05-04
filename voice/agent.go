@@ -45,32 +45,36 @@ func NewAgent(config AgentConfig, opts ...AgentOption) (*Agent, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Agent{
-		config:      config,
-		options:     options,
-		ctx:         ctx,
-		cancel:      cancel,
+		config:       config,
+		options:      options,
+		ctx:          ctx,
+		cancel:       cancel,
 		respAudioChs: options.respAudioChs,
 		respTokenChs: options.respTokenChs,
 		respErrChs:   options.respErrChs,
 		promptChs:    options.promptChs,
-		lock:        sync.Mutex{},
-		started:     atomic.Bool{},
-		stopped:     atomic.Bool{},
+		lock:         sync.Mutex{},
+		started:      atomic.Bool{},
+		stopped:      atomic.Bool{},
 	}, nil
 }
 
 func (a *Agent) start(ctx context.Context) error {
 	a.responder = dialog.NewResponder(dialog.ResponderConfig{
-		Brain:       a.config.Brain,
-		Synthesizer: a.config.Synthesizer,
-		AudioChs:  a.respAudioChs,
-		TokenChs:  a.respTokenChs,
-		ErrChs:    a.respErrChs,
-		PromptChs: a.promptChs,
+		Ctx:                   a.ctx,
+		Brain:                 a.config.Brain,
+		Synthesizer:           a.config.Synthesizer,
+		BrainBufferSize:       a.options.brainBufferSize,
+		SynthesizerBufferSize: a.options.synthesizerBufferSize,
+		SynTokenBufferSize:    a.options.synTokenBufferSize,
+		OutputTokenBufferSize: a.options.outputTokenBufferSize,
+		AudioChs:              a.respAudioChs,
+		TokenChs:              a.respTokenChs,
+		ErrChs:                a.respErrChs,
+		PromptChs:             a.promptChs,
 	})
 
 	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
-		Ctx:                  a.ctx,
 		Responder:            a.responder,
 		MinInterruptDuration: a.options.minInterruptDuration,
 		InterruptOnInterim:   a.options.interruptOnInterim,
@@ -99,6 +103,10 @@ func (a *Agent) start(ctx context.Context) error {
 		}
 	}()
 
+	if a.options.iceBreaking {
+		a.responder.Initiate()
+	}
+
 	return nil
 }
 
@@ -108,7 +116,7 @@ func (a *Agent) Done() <-chan error {
 
 func (a *Agent) stop(ctx context.Context) error {
 	a.cancel()
-	a.recognitionHandler.CancelResponse()
+	a.responder.CancelResponse()
 	return a.recognizer.Stop(ctx)
 }
 

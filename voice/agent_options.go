@@ -10,6 +10,12 @@ type agentOptions struct {
 	promptChs            []chan<- string
 	minInterruptDuration time.Duration
 	interruptOnInterim   bool
+	iceBreaking          bool
+
+	brainBufferSize       int
+	synthesizerBufferSize int
+	synTokenBufferSize    int
+	outputTokenBufferSize int
 }
 
 var defaultAgentOptions = agentOptions{
@@ -77,5 +83,35 @@ func WithMinInterruptDuration(d time.Duration) AgentOption {
 func WithInterruptOnInterim(enabled bool) AgentOption {
 	return AgentOptionFunc(func(options *agentOptions) {
 		options.interruptOnInterim = enabled
+	})
+}
+
+func WithIceBreaking() AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.iceBreaking = true
+	})
+}
+
+func WithBrainBufferSize(size int) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.brainBufferSize = size
+	})
+}
+
+func WithSynthesizerBufferSize(size int) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.synthesizerBufferSize = size
+	})
+}
+
+func WithSynTokenBufferSize(size int) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.synTokenBufferSize = size
+	})
+}
+
+func WithOutputTokenBufferSize(size int) AgentOption {
+	return AgentOptionFunc(func(options *agentOptions) {
+		options.outputTokenBufferSize = size
 	})
 }

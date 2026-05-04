@@ -3,12 +3,18 @@ package dialog
 import (
 	"context"
 	"live-agent-go/voice/core"
+	"strings"
 	"sync"
 )
 
 type ResponderConfig struct {
-	Brain       Brain
-	Synthesizer Synthesizer
+	Ctx                   context.Context
+	Brain                 Brain
+	Synthesizer           Synthesizer
+	BrainBufferSize       int
+	SynthesizerBufferSize int
+	SynTokenBufferSize    int
+	OutputTokenBufferSize int
 
 	AudioChs  []chan<- core.AudioFrame
 	TokenChs  []chan<- core.Token
@@ -17,78 +23,159 @@ type ResponderConfig struct {
 }
 
 type Responder struct {
-	brain       Brain
-	synthesizer Synthesizer
+	ctx                   context.Context
+	brain                 Brain
+	synthesizer           Synthesizer
+	brainBufferSize       int
+	synthesizerBufferSize int
+	synTokenBufferSize    int
+	outputTokenBufferSize int
 
 	audioChs  []chan<- core.AudioFrame
 	tokenChs  []chan<- core.Token
 	errChs    []chan<- error
 	promptChs []chan<- string
+
+	mutex      sync.Mutex
+	cancelResp context.CancelFunc
+	respWg     *sync.WaitGroup
 }
 
 func NewResponder(config ResponderConfig) *Responder {
 	return &Responder{
-		brain:       config.Brain,
-		synthesizer: config.Synthesizer,
-		audioChs:    config.AudioChs,
-		tokenChs:    config.TokenChs,
-		errChs:      config.ErrChs,
-		promptChs:   config.PromptChs,
+		ctx:                   config.Ctx,
+		brain:                 config.Brain,
+		synthesizer:           config.Synthesizer,
+		brainBufferSize:       bufferSize(config.BrainBufferSize, 32),
+		synthesizerBufferSize: bufferSize(config.SynthesizerBufferSize, 32),
+		synTokenBufferSize:    bufferSize(config.SynTokenBufferSize, 32),
+		outputTokenBufferSize: bufferSize(config.OutputTokenBufferSize, 32),
+		audioChs:              config.AudioChs,
+		tokenChs:              config.TokenChs,
+		errChs:                config.ErrChs,
+		promptChs:             config.PromptChs,
 	}
 }
 
-func (r *Responder) Respond(ctx context.Context, prompt string) *sync.WaitGroup {
+func bufferSize(size, fallback int) int {
+	if size <= 0 {
+		return fallback
+	}
+	return size
+}
+
+func (r *Responder) Initiate() {
+	r.CancelResponse()
+
+	ctx := r.createResponseContext()
+	wg := &sync.WaitGroup{}
+	r.generate(ctx, "", wg)
+
+	r.mutex.Lock()
+	r.respWg = wg
+	r.mutex.Unlock()
+}
+
+func (r *Responder) Respond(prompt string) {
+	if strings.TrimSpace(prompt) == "" {
+		return
+	}
+
+	r.CancelResponse()
+
+	ctx := r.createResponseContext()
 	wg := &sync.WaitGroup{}
 
 	for _, ch := range r.promptChs {
 		select {
 		case ch <- prompt:
 		case <-ctx.Done():
-			return wg
+			return
 		}
 	}
 
-	synInputCh := make(chan core.Token, 32)
-	outputTokenCh := make(chan core.Token, 32)
+	r.generate(ctx, prompt, wg)
 
-	inputTokenCh, err := r.brain.Generate(ctx, prompt)
-	if err != nil {
-		r.sendError(ctx, err)
-		return wg
+	r.mutex.Lock()
+	r.respWg = wg
+	r.mutex.Unlock()
+}
+
+func (r *Responder) CancelResponse() {
+	r.mutex.Lock()
+
+	cancel := r.cancelResp
+	wg := r.respWg
+
+	r.cancelResp = nil
+	r.respWg = nil
+
+	r.mutex.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 
-	outputAudioCh, err := r.synthesizer.Synthesize(ctx, synInputCh)
-	if err != nil {
-		r.sendError(ctx, err)
-		return wg
+	if wg != nil {
+		wg.Wait()
 	}
+}
 
-	wg.Add(3)
+func (r *Responder) createResponseContext() context.Context {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	ctx, cancel := context.WithCancel(r.ctx)
+	r.cancelResp = cancel
+	return ctx
+}
+
+func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGroup) {
+	synIn := make(chan core.Token, r.synTokenBufferSize)
+	tokenOut := make(chan core.Token, r.outputTokenBufferSize)
+	brainOut := make(chan core.Token, r.brainBufferSize)
+	audioOut := make(chan core.AudioFrame, r.synthesizerBufferSize)
+
+	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
-		r.forwardTokens(ctx, inputTokenCh, synInputCh, outputTokenCh)
+		defer close(brainOut)
+		if err := r.brain.Generate(ctx, prompt, brainOut); err != nil {
+			r.sendError(ctx, err)
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		r.consumeTokens(ctx, outputTokenCh)
+		defer close(audioOut)
+		if err := r.synthesizer.Synthesize(ctx, synIn, audioOut); err != nil {
+			r.sendError(ctx, err)
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		r.consumeAudios(ctx, outputAudioCh)
+		r.forwardTokens(ctx, brainOut, synIn, tokenOut)
 	}()
 
-	return wg
+	go func() {
+		defer wg.Done()
+		r.consumeTokens(ctx, tokenOut)
+	}()
+
+	go func() {
+		defer wg.Done()
+		r.consumeAudios(ctx, audioOut)
+	}()
 }
 
 func (r *Responder) forwardTokens(ctx context.Context,
-	inputTokenCh <-chan core.Token, synInputCh chan<- core.Token, outputTokenCh chan<- core.Token) {
-	defer close(synInputCh)
-	defer close(outputTokenCh)
+	brainOut <-chan core.Token, synIn chan<- core.Token, tokenOut chan<- core.Token) {
+	defer close(synIn)
+	defer close(tokenOut)
 
-	for token := range inputTokenCh {
+	for token := range brainOut {
 		if ctx.Err() != nil {
 			return
 		}
@@ -96,11 +183,11 @@ func (r *Responder) forwardTokens(ctx context.Context,
 		select {
 		case <-ctx.Done():
 			return
-		case outputTokenCh <- token:
+		case tokenOut <- token:
 		}
 
 		select {
-		case synInputCh <- token:
+		case synIn <- token:
 		default:
 		}
 	}
@@ -116,14 +203,14 @@ func (r *Responder) sendError(ctx context.Context, err error) {
 	}
 }
 
-func (r *Responder) consumeTokens(ctx context.Context, outputTokenCh <-chan core.Token) {
+func (r *Responder) consumeTokens(ctx context.Context, tokenOut <-chan core.Token) {
 	if len(r.tokenChs) == 0 {
-		for range outputTokenCh {
+		for range tokenOut {
 		}
 		return
 	}
 
-	for token := range outputTokenCh {
+	for token := range tokenOut {
 		for _, ch := range r.tokenChs {
 			select {
 			case ch <- token:
@@ -136,18 +223,18 @@ func (r *Responder) consumeTokens(ctx context.Context, outputTokenCh <-chan core
 		}
 	}
 
-	for range outputTokenCh {
+	for range tokenOut {
 	}
 }
 
-func (r *Responder) consumeAudios(ctx context.Context, outputAudioCh <-chan core.AudioFrame) {
+func (r *Responder) consumeAudios(ctx context.Context, audioOut <-chan core.AudioFrame) {
 	if len(r.audioChs) == 0 {
-		for range outputAudioCh {
+		for range audioOut {
 		}
 		return
 	}
 
-	for audio := range outputAudioCh {
+	for audio := range audioOut {
 		audio.Ctx = ctx
 
 		for _, ch := range r.audioChs {
@@ -162,6 +249,6 @@ func (r *Responder) consumeAudios(ctx context.Context, outputAudioCh <-chan core
 		}
 	}
 
-	for range outputAudioCh {
+	for range audioOut {
 	}
 }
