@@ -1,6 +1,6 @@
 package types
 
-import "live-agent-go/voice/core"
+import "github.com/josephnhtam/live-agent-go/voice/core"
 
 type Session interface {
 	AudioIn() <-chan core.AudioFrame

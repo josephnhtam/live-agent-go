@@ -3,8 +3,8 @@ package transcriber
 import (
 	"context"
 	"fmt"
+	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"io"
-	"live-agent-go/voice/helper"
 	"log/slog"
 	"sync"
 
@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"live-agent-go/voice/core"
-	intspeech "live-agent-go/voice/internal/speech"
+	"github.com/josephnhtam/live-agent-go/voice/core"
+	intspeech "github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type GoogleTranscriber struct {

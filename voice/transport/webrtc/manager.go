@@ -3,7 +3,7 @@ package webrtc
 import (
 	"context"
 	"errors"
-	"live-agent-go/voice/transport/types"
+	"github.com/josephnhtam/live-agent-go/voice/transport/types"
 
 	"github.com/pion/webrtc/v3"
 )

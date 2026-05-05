@@ -1,4 +1,4 @@
-module live-agent-go
+module github.com/josephnhtam/live-agent-go
 
 go 1.25.0
 

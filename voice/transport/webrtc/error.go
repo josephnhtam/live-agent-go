@@ -2,7 +2,7 @@ package webrtc
 
 import (
 	"errors"
-	"live-agent-go/voice/transport"
+	"github.com/josephnhtam/live-agent-go/voice/transport"
 )
 
 var (

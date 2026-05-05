@@ -1,8 +1,8 @@
 package voice
 
 import (
-	"live-agent-go/voice/internal/dialog"
-	"live-agent-go/voice/internal/speech"
+	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
+	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type VAD = speech.VAD

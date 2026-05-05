@@ -1,8 +1,8 @@
 package voice
 
 import (
-	"live-agent-go/voice/core"
-	"live-agent-go/voice/internal/speech"
+	"github.com/josephnhtam/live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type AudioFrame = core.AudioFrame

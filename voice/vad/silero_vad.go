@@ -2,8 +2,8 @@ package vad
 
 import (
 	"context"
-	"live-agent-go/voice/core"
-	"live-agent-go/voice/internal/speech"
+	"github.com/josephnhtam/live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 	"time"
 
 	"github.com/zserge/govad"

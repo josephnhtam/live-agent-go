@@ -1,5 +1,5 @@
 package transport
 
-import "live-agent-go/voice/transport/types"
+import "github.com/josephnhtam/live-agent-go/voice/transport/types"
 
 type Session = types.Session

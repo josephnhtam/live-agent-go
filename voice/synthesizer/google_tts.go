@@ -3,9 +3,9 @@ package synthesizer
 import (
 	"context"
 	"fmt"
+	"github.com/josephnhtam/live-agent-go/voice/helper"
+	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
 	"io"
-	"live-agent-go/voice/helper"
-	"live-agent-go/voice/internal/dialog"
 	"log/slog"
 	"strings"
 	"time"
@@ -15,7 +15,7 @@ import (
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
 
-	"live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/core"
 )
 
 type GoogleSynthesizer struct {

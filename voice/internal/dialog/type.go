@@ -1,7 +1,7 @@
 package dialog
 
 import (
-	"live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/core"
 )
 
 type ResponseStream struct {
