@@ -6,7 +6,6 @@ import (
 	"errors"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"github.com/josephnhtam/live-agent-go/voice/transport"
-	"github.com/josephnhtam/live-agent-go/voice/transport/types"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
 )
@@ -45,7 +44,7 @@ type SessionAgentConfig struct {
 }
 
 type SessionAgent struct {
-	session  transport.Session
+	session  Session
 	agent    *Agent
 	options  *SessionAgentOptions
 	audioCh  <-chan AudioFrame
@@ -54,7 +53,7 @@ type SessionAgent struct {
 	logger   *slog.Logger
 }
 
-func NewSessionAgent(session types.Session, config SessionAgentConfig, opts *SessionAgentOptions) (*SessionAgent, error) {
+func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAgentOptions) (*SessionAgent, error) {
 	options := opts
 	if options == nil {
 		options = NewSessionAgentOptions()

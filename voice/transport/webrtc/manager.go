@@ -3,8 +3,7 @@ package webrtc
 import (
 	"context"
 	"errors"
-	"github.com/josephnhtam/live-agent-go/voice/transport/types"
-
+	"github.com/josephnhtam/live-agent-go/voice"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -25,7 +24,7 @@ func NewManager(apiFactory APIFactory, options *ManagerOptions) (*Manager, error
 	}, nil
 }
 
-func (m *Manager) AcceptOffer(ctx context.Context, offerSDP string) (string, types.Session, error) {
+func (m *Manager) AcceptOffer(ctx context.Context, offerSDP string) (string, voice.Session, error) {
 	pc, err := m.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: m.options.iceServers,
 	})

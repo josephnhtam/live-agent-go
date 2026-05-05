@@ -25,3 +25,13 @@ type Transcriber interface {
 	Feed(ctx context.Context, frame AudioFrame) error
 	Transcribe() <-chan Transcript
 }
+
+type Session interface {
+	AudioIn() <-chan AudioFrame
+	MessageIn() <-chan string
+	MessageReady() <-chan struct{}
+	SendAudio(frame AudioFrame, pacing bool) error
+	SendMessage(text string) error
+	Done() <-chan struct{}
+	Close() error
+}

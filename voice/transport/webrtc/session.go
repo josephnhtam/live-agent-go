@@ -3,9 +3,9 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"github.com/josephnhtam/live-agent-go/voice"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"github.com/josephnhtam/live-agent-go/voice/internal/core"
-	"github.com/josephnhtam/live-agent-go/voice/transport/types"
 	"io"
 	"log/slog"
 	"sync"
@@ -38,7 +38,7 @@ type Session struct {
 	messageReady       chan struct{}
 }
 
-var _ types.Session = (*Session)(nil)
+var _ voice.Session = (*Session)(nil)
 
 func newSession(
 	pc *webrtc.PeerConnection,
