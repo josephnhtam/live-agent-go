@@ -17,8 +17,6 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"golang.org/x/sync/errgroup"
-
-	intspeech "github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type GoogleTranscriber struct {
@@ -34,7 +32,7 @@ type GoogleTranscriber struct {
 	wg           sync.WaitGroup
 }
 
-var _ intspeech.Transcriber = (*GoogleTranscriber)(nil)
+var _ voice.Transcriber = (*GoogleTranscriber)(nil)
 
 func NewGoogleTranscriber(config GoogleTranscriberConfig, opts *GoogleTranscriberOptions) *GoogleTranscriber {
 	options := opts
