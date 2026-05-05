@@ -2,9 +2,9 @@ package vad
 
 import (
 	"context"
-	"github.com/josephnhtam/live-agent-go/voice/core"
-	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 	"time"
+
+	"github.com/josephnhtam/live-agent-go/voice"
 
 	"github.com/zserge/govad"
 )
@@ -24,7 +24,7 @@ func silenceFramesFor(duration time.Duration) int {
 type SileroVAD struct {
 	options  SileroVADOptions
 	detector *govad.VAD
-	eventCh  chan speech.VADEvent
+	eventCh  chan voice.VADEvent
 
 	buf    []float32
 	bufLen int
@@ -34,7 +34,7 @@ type SileroVAD struct {
 	maxSilence    int
 }
 
-var _ speech.VAD = (*SileroVAD)(nil)
+var _ voice.VAD = (*SileroVAD)(nil)
 
 func NewSileroVAD(opts ...SileroVADOption) *SileroVAD {
 	options := buildSileroVADOptions(opts...)
@@ -57,7 +57,7 @@ func (v *SileroVAD) Start(ctx context.Context) error {
 	}
 
 	v.detector = detector
-	v.eventCh = make(chan speech.VADEvent, v.options.EventBufferSize)
+	v.eventCh = make(chan voice.VADEvent, v.options.EventBufferSize)
 	v.bufLen = 0
 	v.speaking = false
 	v.silenceFrames = 0
@@ -75,12 +75,12 @@ func (v *SileroVAD) Stop(_ context.Context) error {
 	return nil
 }
 
-func (v *SileroVAD) Feed(ctx context.Context, frame core.AudioFrame) error {
+func (v *SileroVAD) Feed(ctx context.Context, frame voice.AudioFrame) error {
 	if v.detector == nil {
 		return ErrVADNotStarted
 	}
 
-	pcmFrame, ok := frame.(*core.PCMFrame)
+	pcmFrame, ok := frame.(*voice.PCMFrame)
 	if !ok {
 		return ErrUnsupportedFrameType
 	}
@@ -118,7 +118,7 @@ func (v *SileroVAD) Feed(ctx context.Context, frame core.AudioFrame) error {
 	return nil
 }
 
-func (v *SileroVAD) Event() <-chan speech.VADEvent {
+func (v *SileroVAD) Event() <-chan voice.VADEvent {
 	return v.eventCh
 }
 
@@ -129,7 +129,7 @@ func (v *SileroVAD) processFrame(ctx context.Context) {
 		v.silenceFrames = 0
 		if !v.speaking {
 			v.speaking = true
-			v.emit(ctx, speech.VADEventSpeechStart)
+			v.emit(ctx, voice.VADEventSpeechStart)
 		}
 	} else if v.speaking {
 		v.silenceFrames++
@@ -137,19 +137,19 @@ func (v *SileroVAD) processFrame(ctx context.Context) {
 			v.speaking = false
 			v.silenceFrames = 0
 			v.detector.Reset()
-			v.emit(ctx, speech.VADEventSpeechEnd)
+			v.emit(ctx, voice.VADEventSpeechEnd)
 		}
 	}
 }
 
-func (v *SileroVAD) emit(ctx context.Context, event speech.VADEvent) {
+func (v *SileroVAD) emit(ctx context.Context, event voice.VADEvent) {
 	select {
 	case v.eventCh <- event:
 	case <-ctx.Done():
 	}
 }
 
-func convertAndResample(frame *core.PCMFrame) []float32 {
+func convertAndResample(frame *voice.PCMFrame) []float32 {
 	data := frame.PCMData
 	ratio := int(frame.SampleRateHz) / sampleRate
 

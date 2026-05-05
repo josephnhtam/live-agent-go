@@ -3,8 +3,8 @@ package webrtc
 import (
 	"context"
 	"errors"
-	"github.com/josephnhtam/live-agent-go/voice/core"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 	"github.com/josephnhtam/live-agent-go/voice/transport/types"
 	"io"
 	"log/slog"

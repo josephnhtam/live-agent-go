@@ -2,7 +2,7 @@ package speech
 
 import (
 	"context"
-	"github.com/josephnhtam/live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 )
 
 type RecognitionHandler interface {

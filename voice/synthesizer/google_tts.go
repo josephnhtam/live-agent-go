@@ -3,8 +3,8 @@ package synthesizer
 import (
 	"context"
 	"fmt"
+	"github.com/josephnhtam/live-agent-go/voice"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
-	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
 	"io"
 	"log/slog"
 	"strings"
@@ -14,8 +14,6 @@ import (
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
-
-	"github.com/josephnhtam/live-agent-go/voice/core"
 )
 
 type GoogleSynthesizer struct {
@@ -24,7 +22,7 @@ type GoogleSynthesizer struct {
 	logger  *slog.Logger
 }
 
-var _ dialog.Synthesizer = (*GoogleSynthesizer)(nil)
+var _ voice.Synthesizer = (*GoogleSynthesizer)(nil)
 
 func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts ...*GoogleSynthesizerOptions) *GoogleSynthesizer {
 	options := NewGoogleOptions()
@@ -44,7 +42,7 @@ func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts ...*GoogleSynthes
 	}
 }
 
-func (s *GoogleSynthesizer) Synthesize(ctx context.Context, tokens <-chan core.Token, audioCh chan<- core.AudioFrame) error {
+func (s *GoogleSynthesizer) Synthesize(ctx context.Context, tokens <-chan voice.Token, audioCh chan<- voice.AudioFrame) error {
 	client, err := texttospeech.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrCreateClient, err)
@@ -58,11 +56,11 @@ func (s *GoogleSynthesizer) Synthesize(ctx context.Context, tokens <-chan core.T
 func (s *GoogleSynthesizer) streamLoop(
 	ctx context.Context,
 	client *texttospeech.Client,
-	tokens <-chan core.Token,
-	audioCh chan<- core.AudioFrame,
+	tokens <-chan voice.Token,
+	audioCh chan<- voice.AudioFrame,
 ) {
 	for {
-		var firstToken core.Token
+		var firstToken voice.Token
 		select {
 		case token, ok := <-tokens:
 			if !ok {
@@ -140,8 +138,8 @@ func (s *GoogleSynthesizer) openStream(
 func (s *GoogleSynthesizer) sendLoop(
 	ctx context.Context,
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
-	tokens <-chan core.Token,
-	firstToken *core.Token,
+	tokens <-chan voice.Token,
+	firstToken *voice.Token,
 ) error {
 	defer stream.CloseSend()
 
@@ -240,7 +238,7 @@ func (s *GoogleSynthesizer) sendText(
 func (s *GoogleSynthesizer) recvLoop(
 	ctx context.Context,
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
-	audioCh chan<- core.AudioFrame,
+	audioCh chan<- voice.AudioFrame,
 ) error {
 	for {
 		resp, err := stream.Recv()
@@ -259,7 +257,7 @@ func (s *GoogleSynthesizer) recvLoop(
 		samples := helper.BytesToInt16s(data)
 
 		select {
-		case audioCh <- &core.PCMFrame{
+		case audioCh <- &voice.PCMFrame{
 			PCMData:      samples,
 			SampleRateHz: s.options.SampleRate,
 			NumChannels:  1,

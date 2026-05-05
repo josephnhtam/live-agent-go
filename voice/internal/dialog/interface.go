@@ -2,7 +2,7 @@ package dialog
 
 import (
 	"context"
-	"github.com/josephnhtam/live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 )
 
 type Synthesizer interface {

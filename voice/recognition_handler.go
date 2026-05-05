@@ -1,7 +1,6 @@
 package voice
 
 import (
-	"github.com/josephnhtam/live-agent-go/voice/core"
 	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
 	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 	"strings"
@@ -60,7 +59,7 @@ func (r *recognitionHandler) OnSpeechEnd() {
 	r.stopInterruptTimer()
 }
 
-func (r *recognitionHandler) OnSpeechRecognized(transcripts []core.Transcript) {
+func (r *recognitionHandler) OnSpeechRecognized(transcripts []Transcript) {
 	prompt := combineTranscripts(transcripts)
 
 	r.stopInterruptTimer()
@@ -78,7 +77,7 @@ func (r *recognitionHandler) stopInterruptTimer() {
 	}
 }
 
-func combineTranscripts(transcripts []core.Transcript) string {
+func combineTranscripts(transcripts []Transcript) string {
 	if len(transcripts) == 0 {
 		return ""
 	}

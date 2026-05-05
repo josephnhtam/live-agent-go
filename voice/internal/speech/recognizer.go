@@ -3,7 +3,7 @@ package speech
 import (
 	"context"
 	"errors"
-	"github.com/josephnhtam/live-agent-go/voice/core"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 
 	"golang.org/x/sync/errgroup"
 )

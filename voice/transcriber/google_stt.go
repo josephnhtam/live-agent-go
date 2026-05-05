@@ -3,6 +3,7 @@ package transcriber
 import (
 	"context"
 	"fmt"
+	"github.com/josephnhtam/live-agent-go/voice"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"io"
 	"log/slog"
@@ -17,7 +18,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/josephnhtam/live-agent-go/voice/core"
 	intspeech "github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
@@ -29,7 +29,7 @@ type GoogleTranscriber struct {
 	client       *speech.Client
 	recognizer   string
 	audioCh      chan []byte
-	transcriptCh chan core.Transcript
+	transcriptCh chan voice.Transcript
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 }
@@ -72,7 +72,7 @@ func (t *GoogleTranscriber) Start(ctx context.Context) error {
 		t.config.Project, t.config.Location, t.options.Recognizer,
 	)
 	t.audioCh = make(chan []byte, t.options.BufferSize)
-	t.transcriptCh = make(chan core.Transcript, t.options.BufferSize)
+	t.transcriptCh = make(chan voice.Transcript, t.options.BufferSize)
 
 	streamCtx, cancel := context.WithCancel(ctx)
 	t.cancel = cancel
@@ -104,12 +104,12 @@ func (t *GoogleTranscriber) Stop(_ context.Context) error {
 	return nil
 }
 
-func (t *GoogleTranscriber) Feed(ctx context.Context, frame core.AudioFrame) error {
+func (t *GoogleTranscriber) Feed(ctx context.Context, frame voice.AudioFrame) error {
 	if t.audioCh == nil {
 		return ErrTranscriberNotStarted
 	}
 
-	pcmFrame, ok := frame.(*core.PCMFrame)
+	pcmFrame, ok := frame.(*voice.PCMFrame)
 	if !ok {
 		return ErrUnsupportedFrameType
 	}
@@ -130,7 +130,7 @@ func (t *GoogleTranscriber) Feed(ctx context.Context, frame core.AudioFrame) err
 	}
 }
 
-func (t *GoogleTranscriber) Transcribe() <-chan core.Transcript {
+func (t *GoogleTranscriber) Transcribe() <-chan voice.Transcript {
 	return t.transcriptCh
 }
 
@@ -297,7 +297,7 @@ func (t *GoogleTranscriber) receiveLoop(
 				continue
 			}
 
-			transcript := core.Transcript{
+			transcript := voice.Transcript{
 				Text:    alts[0].GetTranscript(),
 				IsFinal: result.GetIsFinal(),
 			}
