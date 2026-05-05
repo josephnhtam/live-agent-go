@@ -22,7 +22,7 @@ func silenceFramesFor(duration time.Duration) int {
 }
 
 type SileroVAD struct {
-	options  SileroVADOptions
+	options  *SileroVADOptions
 	detector *govad.VAD
 	eventCh  chan voice.VADEvent
 
@@ -36,13 +36,16 @@ type SileroVAD struct {
 
 var _ voice.VAD = (*SileroVAD)(nil)
 
-func NewSileroVAD(opts ...SileroVADOption) *SileroVAD {
-	options := buildSileroVADOptions(opts...)
+func NewSileroVAD(opts *SileroVADOptions) *SileroVAD {
+	options := opts
+	if options == nil {
+		options = NewSileroVADOptions()
+	}
 
 	return &SileroVAD{
 		options:    options,
 		buf:        make([]float32, samplesPerFrame),
-		maxSilence: silenceFramesFor(options.SilenceDuration),
+		maxSilence: silenceFramesFor(options.silenceDuration),
 	}
 }
 
@@ -57,7 +60,7 @@ func (v *SileroVAD) Start(ctx context.Context) error {
 	}
 
 	v.detector = detector
-	v.eventCh = make(chan voice.VADEvent, v.options.EventBufferSize)
+	v.eventCh = make(chan voice.VADEvent, v.options.eventBufferSize)
 	v.bufLen = 0
 	v.speaking = false
 	v.silenceFrames = 0
@@ -125,7 +128,7 @@ func (v *SileroVAD) Event() <-chan voice.VADEvent {
 func (v *SileroVAD) processFrame(ctx context.Context) {
 	prob := v.detector.Process(v.buf)
 
-	if prob >= v.options.Threshold {
+	if prob >= v.options.threshold {
 		v.silenceFrames = 0
 		if !v.speaking {
 			v.speaking = true

@@ -17,7 +17,7 @@ type AgentConfig struct {
 
 type Agent struct {
 	config  AgentConfig
-	options *agentOptions
+	options *AgentOptions
 
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -36,12 +36,15 @@ type Agent struct {
 	stopped atomic.Bool
 }
 
-func NewAgent(config AgentConfig, opts ...AgentOption) (*Agent, error) {
+func NewAgent(config AgentConfig, opts *AgentOptions) (*Agent, error) {
 	if err := validateAgentConfig(config); err != nil {
 		return nil, err
 	}
 
-	options := buildAgentOptions(opts...)
+	options := opts
+	if options == nil {
+		options = NewAgentOptions()
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Agent{

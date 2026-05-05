@@ -3,51 +3,30 @@ package vad
 import "time"
 
 type SileroVADOptions struct {
-	Threshold       float32
-	SilenceDuration time.Duration
-	EventBufferSize int
+	threshold       float32
+	silenceDuration time.Duration
+	eventBufferSize int
 }
 
-var defaultSileroVADOptions = SileroVADOptions{
-	Threshold:       0.5,
-	SilenceDuration: 300 * time.Millisecond,
-	EventBufferSize: 8,
-}
-
-type SileroVADOption interface {
-	apply(*SileroVADOptions)
-}
-
-type SileroVADOptionFunc func(*SileroVADOptions)
-
-func (f SileroVADOptionFunc) apply(options *SileroVADOptions) {
-	f(options)
-}
-
-func buildSileroVADOptions(opts ...SileroVADOption) SileroVADOptions {
-	options := defaultSileroVADOptions
-
-	for _, opt := range opts {
-		opt.apply(&options)
+func NewSileroVADOptions() *SileroVADOptions {
+	return &SileroVADOptions{
+		threshold:       0.5,
+		silenceDuration: 300 * time.Millisecond,
+		eventBufferSize: 8,
 	}
-
-	return options
 }
 
-func WithSileroVADThreshold(threshold float32) SileroVADOption {
-	return SileroVADOptionFunc(func(options *SileroVADOptions) {
-		options.Threshold = threshold
-	})
+func (o *SileroVADOptions) WithThreshold(threshold float32) *SileroVADOptions {
+	o.threshold = threshold
+	return o
 }
 
-func WithSileroVADSilenceDuration(duration time.Duration) SileroVADOption {
-	return SileroVADOptionFunc(func(options *SileroVADOptions) {
-		options.SilenceDuration = duration
-	})
+func (o *SileroVADOptions) WithSilenceDuration(duration time.Duration) *SileroVADOptions {
+	o.silenceDuration = duration
+	return o
 }
 
-func WithSileroVADEventBufferSize(size int) SileroVADOption {
-	return SileroVADOptionFunc(func(options *SileroVADOptions) {
-		options.EventBufferSize = size
-	})
+func (o *SileroVADOptions) WithEventBufferSize(size int) *SileroVADOptions {
+	o.eventBufferSize = size
+	return o
 }

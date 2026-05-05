@@ -1,43 +1,22 @@
 package voice
 
-type sessionAgentOptions struct {
+type SessionAgentOptions struct {
 	iceBreaking       bool
 	messageSerializer MessageSerializer
 }
 
-var defaultSessionAgentOptions = sessionAgentOptions{
-	messageSerializer: DefaultMessageSerializer{},
-}
-
-type SessionAgentOption interface {
-	apply(*sessionAgentOptions)
-}
-
-type SessionAgentOptionFunc func(*sessionAgentOptions)
-
-func (f SessionAgentOptionFunc) apply(options *sessionAgentOptions) {
-	f(options)
-}
-
-func buildSessionAgentOptions(opts ...SessionAgentOption) *sessionAgentOptions {
-	defaultOptions := defaultSessionAgentOptions
-	options := &defaultOptions
-
-	for _, opt := range opts {
-		opt.apply(options)
+func NewSessionAgentOptions() *SessionAgentOptions {
+	return &SessionAgentOptions{
+		messageSerializer: DefaultMessageSerializer{},
 	}
-
-	return options
 }
 
-func WithIceBreaking() SessionAgentOption {
-	return SessionAgentOptionFunc(func(options *sessionAgentOptions) {
-		options.iceBreaking = true
-	})
+func (o *SessionAgentOptions) WithIceBreaking() *SessionAgentOptions {
+	o.iceBreaking = true
+	return o
 }
 
-func WithMessageSerializer(serializer MessageSerializer) SessionAgentOption {
-	return SessionAgentOptionFunc(func(options *sessionAgentOptions) {
-		options.messageSerializer = serializer
-	})
+func (o *SessionAgentOptions) WithMessageSerializer(serializer MessageSerializer) *SessionAgentOptions {
+	o.messageSerializer = serializer
+	return o
 }

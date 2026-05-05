@@ -14,10 +14,10 @@ type DefaultAPIFactory struct {
 	options *APIOptions
 }
 
-func NewDefaultAPIFactory(opts ...*APIOptions) *DefaultAPIFactory {
-	options := NewAPIOptions()
-	if len(opts) > 0 && opts[0] != nil {
-		options = opts[0]
+func NewDefaultAPIFactory(opts *APIOptions) *DefaultAPIFactory {
+	options := opts
+	if options == nil {
+		options = NewAPIOptions()
 	}
 
 	return &DefaultAPIFactory{

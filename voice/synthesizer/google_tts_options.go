@@ -11,38 +11,38 @@ type GoogleSynthesizerConfig struct {
 }
 
 type GoogleSynthesizerOptions struct {
-	SampleRate       int32
-	SentenceEndRunes []rune
-	FlushTimeout     time.Duration
-	Logger           *slog.Logger
+	sampleRate       int32
+	sentenceEndRunes []rune
+	flushTimeout     time.Duration
+	logger           *slog.Logger
 }
 
 var defaultSentenceEndRunes = []rune{'.', '?', '!', '\n', '\u3002', '\uFF1F', '\uFF01'}
 
 func NewGoogleOptions() *GoogleSynthesizerOptions {
 	return &GoogleSynthesizerOptions{
-		SampleRate:       24000,
-		SentenceEndRunes: defaultSentenceEndRunes,
-		FlushTimeout:     4 * time.Second,
+		sampleRate:       24000,
+		sentenceEndRunes: defaultSentenceEndRunes,
+		flushTimeout:     4 * time.Second,
 	}
 }
 
 func (o *GoogleSynthesizerOptions) WithSampleRate(rate int32) *GoogleSynthesizerOptions {
-	o.SampleRate = rate
+	o.sampleRate = rate
 	return o
 }
 
 func (o *GoogleSynthesizerOptions) WithSentenceEndRunes(runes []rune) *GoogleSynthesizerOptions {
-	o.SentenceEndRunes = runes
+	o.sentenceEndRunes = runes
 	return o
 }
 
 func (o *GoogleSynthesizerOptions) WithFlushTimeout(d time.Duration) *GoogleSynthesizerOptions {
-	o.FlushTimeout = d
+	o.flushTimeout = d
 	return o
 }
 
 func (o *GoogleSynthesizerOptions) WithLogger(logger *slog.Logger) *GoogleSynthesizerOptions {
-	o.Logger = logger
+	o.logger = logger
 	return o
 }

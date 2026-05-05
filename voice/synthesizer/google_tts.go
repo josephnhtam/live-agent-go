@@ -24,13 +24,13 @@ type GoogleSynthesizer struct {
 
 var _ voice.Synthesizer = (*GoogleSynthesizer)(nil)
 
-func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts ...*GoogleSynthesizerOptions) *GoogleSynthesizer {
-	options := NewGoogleOptions()
-	if len(opts) > 0 && opts[0] != nil {
-		options = opts[0]
+func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts *GoogleSynthesizerOptions) *GoogleSynthesizer {
+	options := opts
+	if options == nil {
+		options = NewGoogleOptions()
 	}
 
-	logger := options.Logger
+	logger := options.logger
 	if logger == nil {
 		logger = helper.NoopLogger()
 	}
@@ -122,7 +122,7 @@ func (s *GoogleSynthesizer) openStream(
 				},
 				StreamingAudioConfig: &texttospeechpb.StreamingAudioConfig{
 					AudioEncoding:   texttospeechpb.AudioEncoding_PCM,
-					SampleRateHertz: s.options.SampleRate,
+					SampleRateHertz: s.options.sampleRate,
 				},
 			},
 		},
@@ -152,7 +152,7 @@ func (s *GoogleSynthesizer) sendLoop(
 		}
 	}
 
-	flushTimer := time.NewTimer(s.options.FlushTimeout)
+	flushTimer := time.NewTimer(s.options.flushTimeout)
 	defer flushTimer.Stop()
 
 	for {
@@ -168,7 +168,7 @@ func (s *GoogleSynthesizer) sendLoop(
 
 				sb.Reset()
 			}
-			flushTimer.Reset(s.options.FlushTimeout)
+			flushTimer.Reset(s.options.flushTimeout)
 
 		case token, ok := <-tokens:
 			if !ok {
@@ -181,7 +181,7 @@ func (s *GoogleSynthesizer) sendLoop(
 				return err
 			}
 
-			flushTimer.Reset(s.options.FlushTimeout)
+			flushTimer.Reset(s.options.flushTimeout)
 		}
 	}
 }
@@ -190,7 +190,7 @@ func (s *GoogleSynthesizer) trySendSentence(
 	sb *strings.Builder,
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
 ) error {
-	before, after, found := helper.SplitAtSentenceEnd(sb.String(), s.options.SentenceEndRunes)
+	before, after, found := helper.SplitAtSentenceEnd(sb.String(), s.options.sentenceEndRunes)
 
 	if !found {
 		return nil
@@ -259,7 +259,7 @@ func (s *GoogleSynthesizer) recvLoop(
 		select {
 		case audioCh <- &voice.PCMFrame{
 			PCMData:      samples,
-			SampleRateHz: s.options.SampleRate,
+			SampleRateHz: s.options.sampleRate,
 			NumChannels:  1,
 		}:
 		case <-ctx.Done():

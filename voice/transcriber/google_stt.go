@@ -36,13 +36,13 @@ type GoogleTranscriber struct {
 
 var _ intspeech.Transcriber = (*GoogleTranscriber)(nil)
 
-func NewGoogleTranscriber(config GoogleTranscriberConfig, opts ...*GoogleTranscriberOptions) *GoogleTranscriber {
-	options := NewGoogleOptions()
-	if len(opts) > 0 && opts[0] != nil {
-		options = opts[0]
+func NewGoogleTranscriber(config GoogleTranscriberConfig, opts *GoogleTranscriberOptions) *GoogleTranscriber {
+	options := opts
+	if options == nil {
+		options = NewGoogleOptions()
 	}
 
-	logger := options.Logger
+	logger := options.logger
 	if logger == nil {
 		logger = helper.NoopLogger()
 	}
@@ -69,10 +69,10 @@ func (t *GoogleTranscriber) Start(ctx context.Context) error {
 	t.client = client
 	t.recognizer = fmt.Sprintf(
 		"projects/%s/locations/%s/recognizers/%s",
-		t.config.Project, t.config.Location, t.options.Recognizer,
+		t.config.Project, t.config.Location, t.options.recognizer,
 	)
-	t.audioCh = make(chan []byte, t.options.BufferSize)
-	t.transcriptCh = make(chan voice.Transcript, t.options.BufferSize)
+	t.audioCh = make(chan []byte, t.options.bufferSize)
+	t.transcriptCh = make(chan voice.Transcript, t.options.bufferSize)
 
 	streamCtx, cancel := context.WithCancel(ctx)
 	t.cancel = cancel
@@ -114,7 +114,7 @@ func (t *GoogleTranscriber) Feed(ctx context.Context, frame voice.AudioFrame) er
 		return ErrUnsupportedFrameType
 	}
 
-	if frame.SampleRate() != t.options.SampleRate {
+	if frame.SampleRate() != t.options.sampleRate {
 		return ErrUnsupportedSampleRate
 	}
 
@@ -148,12 +148,12 @@ func (t *GoogleTranscriber) streamLoop(ctx context.Context) {
 			t.logger.Error("open stream", "error", err)
 			consecutiveFailures++
 
-			if t.options.MaxReconnectAttempts > 0 && consecutiveFailures > t.options.MaxReconnectAttempts {
+			if t.options.maxReconnectAttempts > 0 && consecutiveFailures > t.options.maxReconnectAttempts {
 				t.logger.Error("max reconnect attempts exceeded", "attempts", consecutiveFailures)
 				return
 			}
 
-			if !backoff(ctx, consecutiveFailures, t.options.ReconnectBackoff, t.options.MaxReconnectBackoff) {
+			if !backoff(ctx, consecutiveFailures, t.options.reconnectBackoff, t.options.maxReconnectBackoff) {
 				return
 			}
 			continue
@@ -184,7 +184,7 @@ func (t *GoogleTranscriber) streamLoop(ctx context.Context) {
 
 		t.logger.Warn("stream ended, reconnecting", "error", err)
 
-		if !backoff(ctx, 0, t.options.ReconnectBackoff, t.options.MaxReconnectBackoff) {
+		if !backoff(ctx, 0, t.options.reconnectBackoff, t.options.maxReconnectBackoff) {
 			return
 		}
 	}
@@ -213,17 +213,17 @@ func (t *GoogleTranscriber) createConfigRequest() *speechpb.StreamingRecognizeRe
 					DecodingConfig: &speechpb.RecognitionConfig_ExplicitDecodingConfig{
 						ExplicitDecodingConfig: &speechpb.ExplicitDecodingConfig{
 							Encoding:          speechpb.ExplicitDecodingConfig_LINEAR16,
-							SampleRateHertz:   t.options.SampleRate,
+							SampleRateHertz:   t.options.sampleRate,
 							AudioChannelCount: 1,
 						},
 					},
 					Model:         t.config.Model,
 					LanguageCodes: t.config.Languages,
-					Features:      t.options.RecognitionFeatures,
+					Features:      t.options.recognitionFeatures,
 				},
 				StreamingFeatures: &speechpb.StreamingRecognitionFeatures{
 					InterimResults:         true,
-					EndpointingSensitivity: t.options.EndpointingSensitivity,
+					EndpointingSensitivity: t.options.endpointingSensitivity,
 					VoiceActivityTimeout:   t.buildVoiceActivityTimeout(),
 				},
 			},
@@ -232,17 +232,17 @@ func (t *GoogleTranscriber) createConfigRequest() *speechpb.StreamingRecognizeRe
 }
 
 func (t *GoogleTranscriber) buildVoiceActivityTimeout() *speechpb.StreamingRecognitionFeatures_VoiceActivityTimeout {
-	if t.options.SpeechEndTimeout == 0 && t.options.SpeechStartTimeout == 0 {
+	if t.options.speechEndTimeout == 0 && t.options.speechStartTimeout == 0 {
 		return nil
 	}
 
 	vat := &speechpb.StreamingRecognitionFeatures_VoiceActivityTimeout{}
-	if t.options.SpeechStartTimeout > 0 {
-		vat.SpeechStartTimeout = durationpb.New(t.options.SpeechStartTimeout)
+	if t.options.speechStartTimeout > 0 {
+		vat.SpeechStartTimeout = durationpb.New(t.options.speechStartTimeout)
 
 	}
-	if t.options.SpeechEndTimeout > 0 {
-		vat.SpeechEndTimeout = durationpb.New(t.options.SpeechEndTimeout)
+	if t.options.speechEndTimeout > 0 {
+		vat.SpeechEndTimeout = durationpb.New(t.options.speechEndTimeout)
 	}
 
 	return vat

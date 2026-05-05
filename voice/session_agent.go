@@ -40,40 +40,39 @@ func (d DefaultMessageSerializer) Serialize(msg Message) (string, error) {
 
 type SessionAgentConfig struct {
 	AgentConfig  AgentConfig
-	AgentOptions []AgentOption
+	AgentOptions *AgentOptions
 	Logger       *slog.Logger
 }
 
 type SessionAgent struct {
 	session  transport.Session
 	agent    *Agent
-	options  *sessionAgentOptions
+	options  *SessionAgentOptions
 	audioCh  <-chan AudioFrame
 	tokenCh  <-chan Token
 	promptCh <-chan Prompt
 	logger   *slog.Logger
 }
 
-func NewSessionAgent(session types.Session, config SessionAgentConfig, opts ...SessionAgentOption) (*SessionAgent, error) {
-	options := buildSessionAgentOptions(opts...)
-
-	audioCh := make(chan AudioFrame, 128)
-
-	agentOpts := []AgentOption{
-		SubscribeAudio(audioCh),
+func NewSessionAgent(session types.Session, config SessionAgentConfig, opts *SessionAgentOptions) (*SessionAgent, error) {
+	options := opts
+	if options == nil {
+		options = NewSessionAgentOptions()
 	}
 
-	agentOpts = append(agentOpts, config.AgentOptions...)
-
+	audioCh := make(chan AudioFrame, 128)
 	tokenCh := make(chan Token, 32)
 	promptCh := make(chan Prompt, 32)
 
-	agentOpts = append(agentOpts,
-		SubscribeToken(tokenCh),
-		SubscribePrompt(promptCh),
-	)
+	agentOpts := config.AgentOptions
+	if agentOpts == nil {
+		agentOpts = NewAgentOptions()
+	}
+	agentOpts.SubscribeAudio(audioCh).
+		SubscribeToken(tokenCh).
+		SubscribePrompt(promptCh)
 
-	agent, err := NewAgent(config.AgentConfig, agentOpts...)
+	agent, err := NewAgent(config.AgentConfig, agentOpts)
 	if err != nil {
 		return nil, err
 	}

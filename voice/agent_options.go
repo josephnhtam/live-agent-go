@@ -2,109 +2,78 @@ package voice
 
 import "time"
 
-type agentOptions struct {
-	vad                  VAD
-	respAudioChs         []chan<- AudioFrame
-	respTokenChs         []chan<- Token
-	respErrChs           []chan<- error
-	promptChs            []chan<- Prompt
-	minInterruptDuration time.Duration
-	interruptOnInterim bool
-
+type AgentOptions struct {
+	vad                   VAD
+	respAudioChs          []chan<- AudioFrame
+	respTokenChs          []chan<- Token
+	respErrChs            []chan<- error
+	promptChs             []chan<- Prompt
+	minInterruptDuration  time.Duration
+	interruptOnInterim    bool
 	brainBufferSize       int
 	synthesizerBufferSize int
 	synTokenBufferSize    int
 	outputTokenBufferSize int
 }
 
-var defaultAgentOptions = agentOptions{
-	minInterruptDuration: 300 * time.Millisecond,
-	interruptOnInterim:   true,
-}
-
-type AgentOption interface {
-	apply(*agentOptions)
-}
-
-type AgentOptionFunc func(*agentOptions)
-
-func (f AgentOptionFunc) apply(options *agentOptions) {
-	f(options)
-}
-
-func buildAgentOptions(opts ...AgentOption) *agentOptions {
-	defaultOptions := defaultAgentOptions
-	options := &defaultOptions
-
-	for _, opt := range opts {
-		opt.apply(options)
+func NewAgentOptions() *AgentOptions {
+	return &AgentOptions{
+		minInterruptDuration: 300 * time.Millisecond,
+		interruptOnInterim:   true,
 	}
-
-	return options
 }
 
-func SubscribeAudio(ch chan<- AudioFrame) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.respAudioChs = append(options.respAudioChs, ch)
-	})
+func (o *AgentOptions) SubscribeAudio(ch chan<- AudioFrame) *AgentOptions {
+	o.respAudioChs = append(o.respAudioChs, ch)
+	return o
 }
 
-func SubscribeToken(ch chan<- Token) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.respTokenChs = append(options.respTokenChs, ch)
-	})
+func (o *AgentOptions) SubscribeToken(ch chan<- Token) *AgentOptions {
+	o.respTokenChs = append(o.respTokenChs, ch)
+	return o
 }
 
-func SubscribeErr(ch chan<- error) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.respErrChs = append(options.respErrChs, ch)
-	})
+func (o *AgentOptions) SubscribeErr(ch chan<- error) *AgentOptions {
+	o.respErrChs = append(o.respErrChs, ch)
+	return o
 }
 
-func SubscribePrompt(ch chan<- Prompt) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.promptChs = append(options.promptChs, ch)
-	})
+func (o *AgentOptions) SubscribePrompt(ch chan<- Prompt) *AgentOptions {
+	o.promptChs = append(o.promptChs, ch)
+	return o
 }
 
-func WithVAD(vad VAD) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.vad = vad
-	})
+func (o *AgentOptions) WithVAD(vad VAD) *AgentOptions {
+	o.vad = vad
+	return o
 }
 
-func WithMinInterruptDuration(d time.Duration) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.minInterruptDuration = d
-	})
+func (o *AgentOptions) WithMinInterruptDuration(d time.Duration) *AgentOptions {
+	o.minInterruptDuration = d
+	return o
 }
 
-func WithInterruptOnInterim(enabled bool) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.interruptOnInterim = enabled
-	})
+func (o *AgentOptions) WithInterruptOnInterim(enabled bool) *AgentOptions {
+	o.interruptOnInterim = enabled
+	return o
 }
 
-func WithBrainBufferSize(size int) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.brainBufferSize = size
-	})
+func (o *AgentOptions) WithBrainBufferSize(size int) *AgentOptions {
+	o.brainBufferSize = size
+	return o
 }
 
-func WithSynthesizerBufferSize(size int) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.synthesizerBufferSize = size
-	})
+func (o *AgentOptions) WithSynthesizerBufferSize(size int) *AgentOptions {
+	o.synthesizerBufferSize = size
+	return o
 }
 
-func WithSynTokenBufferSize(size int) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.synTokenBufferSize = size
-	})
+func (o *AgentOptions) WithSynTokenBufferSize(size int) *AgentOptions {
+	o.synTokenBufferSize = size
+	return o
 }
 
-func WithOutputTokenBufferSize(size int) AgentOption {
-	return AgentOptionFunc(func(options *agentOptions) {
-		options.outputTokenBufferSize = size
-	})
+func (o *AgentOptions) WithOutputTokenBufferSize(size int) *AgentOptions {
+	o.outputTokenBufferSize = size
+	return o
 }

@@ -15,84 +15,84 @@ type GoogleTranscriberConfig struct {
 }
 
 type GoogleTranscriberOptions struct {
-	Recognizer             string
-	SampleRate             int32
-	BufferSize             int
-	MaxReconnectAttempts   int
-	ReconnectBackoff       time.Duration
-	MaxReconnectBackoff    time.Duration
-	EndpointingSensitivity speechpb.StreamingRecognitionFeatures_EndpointingSensitivity
-	SpeechEndTimeout       time.Duration
-	SpeechStartTimeout     time.Duration
-	RecognitionFeatures    *speechpb.RecognitionFeatures
-	Logger                 *slog.Logger
+	recognizer             string
+	sampleRate             int32
+	bufferSize             int
+	maxReconnectAttempts   int
+	reconnectBackoff       time.Duration
+	maxReconnectBackoff    time.Duration
+	endpointingSensitivity speechpb.StreamingRecognitionFeatures_EndpointingSensitivity
+	speechEndTimeout       time.Duration
+	speechStartTimeout     time.Duration
+	recognitionFeatures    *speechpb.RecognitionFeatures
+	logger                 *slog.Logger
 }
 
 func NewGoogleOptions() *GoogleTranscriberOptions {
 	return &GoogleTranscriberOptions{
-		Recognizer:           "_",
-		SampleRate:           48000,
-		BufferSize:           128,
-		MaxReconnectAttempts: 3,
-		ReconnectBackoff:     100 * time.Millisecond,
-		MaxReconnectBackoff:  5 * time.Second,
-		RecognitionFeatures: &speechpb.RecognitionFeatures{
+		recognizer:           "_",
+		sampleRate:           48000,
+		bufferSize:           128,
+		maxReconnectAttempts: 3,
+		reconnectBackoff:     100 * time.Millisecond,
+		maxReconnectBackoff:  5 * time.Second,
+		recognitionFeatures: &speechpb.RecognitionFeatures{
 			EnableAutomaticPunctuation: true,
 		},
 	}
 }
 
 func (o *GoogleTranscriberOptions) WithRecognizer(name string) *GoogleTranscriberOptions {
-	o.Recognizer = name
+	o.recognizer = name
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithSampleRate(rate int32) *GoogleTranscriberOptions {
-	o.SampleRate = rate
+	o.sampleRate = rate
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithBufferSize(size int) *GoogleTranscriberOptions {
-	o.BufferSize = size
+	o.bufferSize = size
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithMaxReconnectAttempts(maxAttempts int) *GoogleTranscriberOptions {
-	o.MaxReconnectAttempts = maxAttempts
+	o.maxReconnectAttempts = maxAttempts
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithReconnectBackoff(duration time.Duration) *GoogleTranscriberOptions {
-	o.ReconnectBackoff = duration
+	o.reconnectBackoff = duration
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithMaxReconnectBackoff(duration time.Duration) *GoogleTranscriberOptions {
-	o.MaxReconnectBackoff = duration
+	o.maxReconnectBackoff = duration
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithEndpointingSensitivity(sensitivity speechpb.StreamingRecognitionFeatures_EndpointingSensitivity) *GoogleTranscriberOptions {
-	o.EndpointingSensitivity = sensitivity
+	o.endpointingSensitivity = sensitivity
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithSpeechEndTimeout(duration time.Duration) *GoogleTranscriberOptions {
-	o.SpeechEndTimeout = duration
+	o.speechEndTimeout = duration
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithSpeechStartTimeout(duration time.Duration) *GoogleTranscriberOptions {
-	o.SpeechStartTimeout = duration
+	o.speechStartTimeout = duration
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithRecognitionFeatures(features *speechpb.RecognitionFeatures) *GoogleTranscriberOptions {
-	o.RecognitionFeatures = features
+	o.recognitionFeatures = features
 	return o
 }
 
 func (o *GoogleTranscriberOptions) WithLogger(logger *slog.Logger) *GoogleTranscriberOptions {
-	o.Logger = logger
+	o.logger = logger
 	return o
 }
