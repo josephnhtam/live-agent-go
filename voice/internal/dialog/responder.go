@@ -2,9 +2,11 @@ package dialog
 
 import (
 	"context"
-	"github.com/josephnhtam/live-agent-go/voice/internal/core"
+	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 
 	"github.com/google/uuid"
 )
@@ -22,6 +24,7 @@ type ResponderConfig struct {
 	TokenChs  []chan<- core.Token
 	ErrChs    []chan<- error
 	PromptChs []chan<- core.Prompt
+	Logger    *slog.Logger
 }
 
 type Responder struct {
@@ -37,6 +40,7 @@ type Responder struct {
 	tokenChs  []chan<- core.Token
 	errChs    []chan<- error
 	promptChs []chan<- core.Prompt
+	logger    *slog.Logger
 
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
@@ -44,6 +48,11 @@ type Responder struct {
 }
 
 func NewResponder(config ResponderConfig) *Responder {
+	logger := config.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &Responder{
 		ctx:                   config.Ctx,
 		brain:                 config.Brain,
@@ -56,6 +65,7 @@ func NewResponder(config ResponderConfig) *Responder {
 		tokenChs:              config.TokenChs,
 		errChs:                config.ErrChs,
 		promptChs:             config.PromptChs,
+		logger:                logger.WithGroup("responder"),
 	}
 }
 
@@ -186,11 +196,16 @@ func (r *Responder) forwardTokens(ctx context.Context,
 		case <-ctx.Done():
 			return
 		case tokenOut <- token:
+		default:
+			r.logger.Warn("token output channel full, dropping token")
 		}
 
 		select {
+		case <-ctx.Done():
+			return
 		case synIn <- token:
 		default:
+			r.logger.Warn("synthesizer token channel full, dropping token")
 		}
 	}
 }

@@ -63,6 +63,11 @@ func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAg
 	tokenCh := make(chan Token, 32)
 	promptCh := make(chan Prompt, 32)
 
+	logger := config.Logger
+	if logger == nil {
+		logger = helper.NoopLogger()
+	}
+
 	agentOpts := config.AgentOptions
 	if agentOpts == nil {
 		agentOpts = NewAgentOptions()
@@ -71,14 +76,13 @@ func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAg
 		SubscribeToken(tokenCh).
 		SubscribePrompt(promptCh)
 
+	if agentOpts.logger == nil {
+		agentOpts.logger = logger
+	}
+
 	agent, err := NewAgent(config.AgentConfig, agentOpts)
 	if err != nil {
 		return nil, err
-	}
-
-	logger := config.Logger
-	if logger == nil {
-		logger = helper.NoopLogger()
 	}
 
 	return &SessionAgent{

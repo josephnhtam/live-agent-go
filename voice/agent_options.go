@@ -1,6 +1,9 @@
 package voice
 
-import "time"
+import (
+	"log/slog"
+	"time"
+)
 
 type AgentOptions struct {
 	vad                   VAD
@@ -14,6 +17,7 @@ type AgentOptions struct {
 	synthesizerBufferSize int
 	synTokenBufferSize    int
 	outputTokenBufferSize int
+	logger                *slog.Logger
 }
 
 func NewAgentOptions() *AgentOptions {
@@ -75,5 +79,10 @@ func (o *AgentOptions) WithSynTokenBufferSize(size int) *AgentOptions {
 
 func (o *AgentOptions) WithOutputTokenBufferSize(size int) *AgentOptions {
 	o.outputTokenBufferSize = size
+	return o
+}
+
+func (o *AgentOptions) WithLogger(logger *slog.Logger) *AgentOptions {
+	o.logger = logger
 	return o
 }

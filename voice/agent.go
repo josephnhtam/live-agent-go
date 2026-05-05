@@ -3,10 +3,13 @@ package voice
 import (
 	"context"
 	"errors"
-	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
-	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
+	"log/slog"
 	"sync"
 	"sync/atomic"
+
+	"github.com/josephnhtam/live-agent-go/voice/helper"
+	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
+	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type AgentConfig struct {
@@ -18,6 +21,7 @@ type AgentConfig struct {
 type Agent struct {
 	config  AgentConfig
 	options *AgentOptions
+	logger  *slog.Logger
 
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -45,11 +49,18 @@ func NewAgent(config AgentConfig, opts *AgentOptions) (*Agent, error) {
 	if options == nil {
 		options = NewAgentOptions()
 	}
+
+	logger := options.logger
+	if logger == nil {
+		logger = helper.NoopLogger()
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Agent{
 		config:       config,
 		options:      options,
+		logger:       logger.WithGroup("agent"),
 		ctx:          ctx,
 		cancel:       cancel,
 		respAudioChs: options.respAudioChs,
@@ -75,6 +86,7 @@ func (a *Agent) start(ctx context.Context) error {
 		TokenChs:              a.respTokenChs,
 		ErrChs:                a.respErrChs,
 		PromptChs:             a.promptChs,
+		Logger:                a.logger,
 	})
 
 	a.recognitionHandler = newRecognitionHandler(recognitionHandlerConfig{
