@@ -59,9 +59,9 @@ func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAg
 		options = NewSessionAgentOptions()
 	}
 
-	audioCh := make(chan AudioFrame, 128)
-	tokenCh := make(chan Token, 32)
-	promptCh := make(chan Prompt, 32)
+	audioCh := make(chan AudioFrame, options.audioBufferSize)
+	tokenCh := make(chan Token, options.tokenBufferSize)
+	promptCh := make(chan Prompt, options.promptBufferSize)
 
 	logger := config.Logger
 	if logger == nil {
