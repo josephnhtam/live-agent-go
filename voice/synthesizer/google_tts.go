@@ -3,12 +3,13 @@ package synthesizer
 import (
 	"context"
 	"fmt"
-	"github.com/josephnhtam/live-agent-go/voice"
-	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"io"
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/josephnhtam/live-agent-go/voice"
+	"github.com/josephnhtam/live-agent-go/voice/helper"
 
 	"golang.org/x/sync/errgroup"
 
@@ -23,6 +24,10 @@ type GoogleSynthesizer struct {
 }
 
 var _ voice.Synthesizer = (*GoogleSynthesizer)(nil)
+
+func (s *GoogleSynthesizer) SampleRate() int32 {
+	return s.options.sampleRate
+}
 
 func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts *GoogleSynthesizerOptions) *GoogleSynthesizer {
 	options := opts
@@ -241,9 +246,13 @@ func (s *GoogleSynthesizer) recvLoop(
 	audioCh chan<- voice.AudioFrame,
 ) error {
 	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		resp, err := stream.Recv()
 		if err != nil {
-			if err == io.EOF || ctx.Err() != nil {
+			if err == io.EOF {
 				return nil
 			}
 			return fmt.Errorf("%w: %w", ErrRecv, err)
@@ -261,6 +270,7 @@ func (s *GoogleSynthesizer) recvLoop(
 			PCMData:      samples,
 			SampleRateHz: s.options.sampleRate,
 			NumChannels:  1,
+			Ctx:          ctx,
 		}:
 		case <-ctx.Done():
 			return nil

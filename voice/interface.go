@@ -9,6 +9,7 @@ type Brain interface {
 }
 
 type Synthesizer interface {
+	SampleRate() int32
 	Synthesize(ctx context.Context, tokens <-chan Token, audio chan<- AudioFrame) error
 }
 
