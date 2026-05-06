@@ -143,7 +143,7 @@ func (r *Responder) createResponseContext() context.Context {
 }
 
 func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGroup) {
-	synIn := make(chan core.Token, r.synTokenBufferSize)
+	synthIn := make(chan core.Token, r.synTokenBufferSize)
 	tokenOut := make(chan core.Token, r.outputTokenBufferSize)
 	brainOut := make(chan core.Token, r.brainBufferSize)
 	audioOut := make(chan core.AudioFrame, r.synthesizerBufferSize)
@@ -161,14 +161,14 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 	go func() {
 		defer wg.Done()
 		defer close(audioOut)
-		if err := r.synthesizer.Synthesize(ctx, synIn, audioOut); err != nil {
+		if err := r.synthesizer.Synthesize(ctx, synthIn, audioOut); err != nil {
 			r.sendError(ctx, err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		r.forwardTokens(ctx, brainOut, synIn, tokenOut)
+		r.forwardTokens(ctx, brainOut, synthIn, tokenOut)
 	}()
 
 	go func() {
