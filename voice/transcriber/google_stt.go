@@ -135,29 +135,19 @@ func (t *GoogleTranscriber) Transcribe() <-chan voice.Transcript {
 func (t *GoogleTranscriber) streamLoop(ctx context.Context) {
 	defer close(t.transcriptCh)
 
-	consecutiveFailures := 0
+	r := helper.NewRetrier(helper.RetrierConfig{
+		RetryOn:                isReconnectable,
+		MaxConsecutiveAttempts: t.options.maxReconnectAttempts,
+		Backoff:                t.options.reconnectBackoff,
+		MaxBackoff:             t.options.maxReconnectBackoff,
+	})
 
-	for {
+	if err := r.Execute(ctx, func(ctx context.Context) error {
 		stream, err := t.openStream(ctx)
 		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
 			t.logger.Error("open stream", "error", err)
-			consecutiveFailures++
-
-			if t.options.maxReconnectAttempts > 0 && consecutiveFailures > t.options.maxReconnectAttempts {
-				t.logger.Error("max reconnect attempts exceeded", "attempts", consecutiveFailures)
-				return
-			}
-
-			if !backoff(ctx, consecutiveFailures, t.options.reconnectBackoff, t.options.maxReconnectBackoff) {
-				return
-			}
-			continue
+			return err
 		}
-
-		consecutiveFailures = 0
 
 		grp, grpCtx := errgroup.WithContext(ctx)
 
@@ -169,22 +159,9 @@ func (t *GoogleTranscriber) streamLoop(ctx context.Context) {
 			return t.receiveLoop(grpCtx, stream)
 		})
 
-		err = grp.Wait()
-
-		if ctx.Err() != nil {
-			return
-		}
-
-		if !isReconnectable(err) {
-			t.logger.Error("non-reconnectable error", "error", err)
-			return
-		}
-
-		t.logger.Warn("stream ended, reconnecting", "error", err)
-
-		if !backoff(ctx, 0, t.options.reconnectBackoff, t.options.maxReconnectBackoff) {
-			return
-		}
+		return grp.Wait()
+	}); err != nil && ctx.Err() == nil {
+		t.logger.Error("stream loop exited", "error", err)
 	}
 }
 
