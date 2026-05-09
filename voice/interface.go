@@ -1,5 +1,7 @@
 package voice
 
+//go:generate mockgen -source=interface.go -destination=mock_voice/mock_voice.go -package=mock_voice
+
 import (
 	"context"
 	"github.com/josephnhtam/live-agent-go/voice/audio"

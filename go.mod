@@ -12,7 +12,9 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/pion/interceptor v0.1.45
 	github.com/pion/webrtc/v3 v3.3.6
+	github.com/stretchr/testify v1.11.1
 	github.com/zserge/govad v0.0.0-20260330155402-74750eabf3a4
+	go.uber.org/mock v0.6.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.277.0
 	google.golang.org/grpc v1.81.0
@@ -56,7 +58,6 @@ require (
 	github.com/pion/transport/v2 v2.2.10 // indirect
 	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/wlynxg/anet v0.0.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.67.0 // indirect

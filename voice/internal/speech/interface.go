@@ -1,5 +1,7 @@
 package speech
 
+//go:generate mockgen -source=interface.go -destination=mock_speech/mock_speech.go -package=mock_speech
+
 import (
 	"context"
 	"github.com/josephnhtam/live-agent-go/voice/internal/core"
