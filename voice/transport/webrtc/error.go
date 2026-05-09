@@ -15,6 +15,7 @@ var (
 	ErrOpusEncode            = errors.New("failed to encode Opus frame")
 	ErrAddTrack              = errors.New("failed to add local track")
 	ErrSetRemoteDescription  = errors.New("failed to set remote description")
+	ErrCreateOffer           = errors.New("failed to create offer")
 	ErrCreateAnswer          = errors.New("failed to create answer")
 	ErrSetLocalDescription   = errors.New("failed to set local description")
 	ErrICEGatheringCancelled = errors.New("ICE gathering cancelled")

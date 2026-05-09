@@ -75,3 +75,60 @@ func (m *Manager) AcceptOffer(ctx context.Context, offerSDP string) (string, voi
 	success = true
 	return pc.LocalDescription().SDP, session, nil
 }
+
+func (m *Manager) CreateOffer(ctx context.Context) (string, voice.Session, AcceptAnswerFunc, error) {
+	pc, err := m.api.NewPeerConnection(webrtc.Configuration{
+		ICEServers: m.options.iceServers,
+	})
+	if err != nil {
+		return "", nil, nil, errors.Join(ErrCreatePeerConnection, err)
+	}
+
+	success := false
+	var session *Session
+	defer func() {
+		if !success {
+			if session != nil {
+				_ = session.Close(context.Background())
+			} else {
+				_ = pc.Close()
+			}
+		}
+	}()
+
+	session, err = newSession(pc, m.options)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		return "", nil, nil, errors.Join(ErrCreateOffer, err)
+	}
+
+	if err := pc.SetLocalDescription(offer); err != nil {
+		return "", nil, nil, errors.Join(ErrSetLocalDescription, err)
+	}
+
+	select {
+	case <-webrtc.GatheringCompletePromise(pc):
+	case <-ctx.Done():
+		return "", nil, nil, errors.Join(ErrICEGatheringCancelled, ctx.Err())
+	}
+
+	acceptAnswer := func(answerSDP string) error {
+		answer := webrtc.SessionDescription{
+			Type: webrtc.SDPTypeAnswer,
+			SDP:  answerSDP,
+		}
+		if err := pc.SetRemoteDescription(answer); err != nil {
+			return errors.Join(ErrSetRemoteDescription, err)
+		}
+		return nil
+	}
+
+	success = true
+	return pc.LocalDescription().SDP, session, acceptAnswer, nil
+}
+
+type AcceptAnswerFunc func(answerSDP string) error
