@@ -6,8 +6,11 @@ require (
 	cloud.google.com/go/speech v1.34.0
 	cloud.google.com/go/texttospeech v1.20.0
 	github.com/deepgram/deepgram-go-sdk/v3 v3.5.0
+	github.com/go-audio/audio v1.0.0
+	github.com/go-audio/wav v1.1.0
 	github.com/google/uuid v1.6.0
-	github.com/pion/interceptor v0.1.29
+	github.com/gorilla/websocket v1.5.3
+	github.com/pion/interceptor v0.1.45
 	github.com/pion/webrtc/v3 v3.3.6
 	github.com/zserge/govad v0.0.0-20260330155402-74750eabf3a4
 	golang.org/x/sync v0.20.0
@@ -28,6 +31,7 @@ require (
 	github.com/dvonthenen/websocket v1.5.1-dyv.2 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -40,11 +44,11 @@ require (
 	github.com/pion/datachannel v1.5.8 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/ice/v2 v2.3.38 // indirect
-	github.com/pion/logging v0.2.2 // indirect
+	github.com/pion/logging v0.2.4 // indirect
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.14 // indirect
-	github.com/pion/rtp v1.8.7 // indirect
+	github.com/pion/rtcp v1.2.16 // indirect
+	github.com/pion/rtp v1.10.1 // indirect
 	github.com/pion/sctp v1.8.19 // indirect
 	github.com/pion/sdp/v3 v3.0.9 // indirect
 	github.com/pion/srtp/v2 v2.0.20 // indirect

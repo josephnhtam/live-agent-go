@@ -3,10 +3,8 @@ package webrtc
 import (
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/josephnhtam/live-agent-go/voice"
@@ -14,34 +12,20 @@ import (
 	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 
 	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/pkg/media"
 	"gopkg.in/hraban/opus.v2"
 )
 
 type Session struct {
 	pc        *webrtc.PeerConnection
-	audioIn   chan core.AudioFrame
-	messageIn chan string
+	sender    *audioSender
+	receiver  *audioReceiver
+	messaging *messageHandler
 	ctx       context.Context
 	cancel    context.CancelFunc
-	trackWg   sync.WaitGroup
 	once      sync.Once
+	connected chan struct{}
+	connOnce  sync.Once
 	logger    *slog.Logger
-
-	sendMutex          sync.Mutex
-	outTrack           *webrtc.TrackLocalStaticSample
-	encoder            *opus.Encoder
-	outBuf             []int16
-	outBufLen          int
-	tokenBucket        *helper.TokenBucket
-	resampleLastSample int16
-	audioInEncoding    AudioInEncoding
-	messageChannelName string
-	messageDataChannel atomic.Pointer[webrtc.DataChannel]
-	messageReady       chan struct{}
-	connected          chan struct{}
-	connectedOnce      sync.Once
-	messageReadyOnce   sync.Once
 }
 
 var _ voice.Session = (*Session)(nil)
@@ -86,22 +70,17 @@ func newSession(
 	if logger == nil {
 		logger = helper.NoopLogger()
 	}
+	logger = logger.WithGroup("webrtc_session")
 
 	s := &Session{
-		pc:                 pc,
-		audioIn:            make(chan core.AudioFrame, options.audioBufferSize),
-		messageIn:          make(chan string, options.messageBufferSize),
-		ctx:                ctx,
-		cancel:             cancel,
-		logger:             logger.WithGroup("webrtc_session"),
-		outTrack:           outTrack,
-		encoder:            encoder,
-		outBuf:             make([]int16, OpusFrameSamples),
-		tokenBucket:        helper.NewTokenBucket(OpusFrameDuration, options.pacingBurst),
-		audioInEncoding:    options.audioInEncoding,
-		messageChannelName: options.messageChannelName,
-		messageReady:       make(chan struct{}),
-		connected:          make(chan struct{}),
+		pc:        pc,
+		sender:    newAudioSender(outTrack, encoder, helper.NewTokenBucket(OpusFrameDuration, options.pacingBurst)),
+		receiver:  newAudioReceiver(options.audioBufferSize, options.audioInEncoding, ctx, logger),
+		messaging: newMessageHandler(options.messageChannelName, options.messageBufferSize, ctx, logger),
+		ctx:       ctx,
+		cancel:    cancel,
+		connected: make(chan struct{}),
+		logger:    logger,
 	}
 
 	s.setupCallbacks()
@@ -112,6 +91,76 @@ func newSession(
 
 	success = true
 	return s, nil
+}
+
+func (s *Session) AudioIn() <-chan core.AudioFrame {
+	return s.receiver.AudioIn()
+}
+
+func (s *Session) MessageIn() <-chan string {
+	if s.messaging == nil {
+		return nil
+	}
+	return s.messaging.MessageIn()
+}
+
+func (s *Session) MessageReady() <-chan struct{} {
+	if s.messaging == nil {
+		return nil
+	}
+	return s.messaging.MessageReady()
+}
+
+func (s *Session) Connected() <-chan struct{} {
+	return s.connected
+}
+
+func (s *Session) SendAudio(frame core.AudioFrame, pacing bool) error {
+	if s.ctx.Err() != nil {
+		return ErrSessionClosed
+	}
+
+	return s.sender.SendAudio(frame, pacing)
+}
+
+func (s *Session) SendMessage(text string) error {
+	if s.ctx.Err() != nil {
+		return ErrSessionClosed
+	}
+
+	if s.messaging == nil {
+		return ErrDataChannelNotOpen
+	}
+
+	return s.messaging.SendMessage(text)
+}
+
+func (s *Session) Done() <-chan struct{} {
+	return s.ctx.Done()
+}
+
+func (s *Session) Close(ctx context.Context) error {
+	var closeErr error
+
+	s.once.Do(func() {
+		s.cancel()
+
+		pcErr := s.pc.Close()
+		wgErr := s.receiver.Wait(ctx)
+
+		s.receiver.Close()
+		if s.messaging != nil {
+			s.messaging.Close()
+		}
+
+		closeErr = errors.Join(pcErr, wgErr)
+	})
+
+	return closeErr
+}
+
+func (s *Session) closeAsync() {
+	go s.Close(context.Background())
 }
 
 func (s *Session) connectionTimeoutLoop(timeout time.Duration) {
@@ -127,154 +176,9 @@ func (s *Session) connectionTimeoutLoop(timeout time.Duration) {
 	}
 }
 
-func (s *Session) AudioIn() <-chan core.AudioFrame {
-	return s.audioIn
-}
-
-func (s *Session) MessageIn() <-chan string {
-	return s.messageIn
-}
-
-func (s *Session) MessageReady() <-chan struct{} {
-	return s.messageReady
-}
-
-func (s *Session) Connected() <-chan struct{} {
-	return s.connected
-}
-
-func (s *Session) SendAudio(frame core.AudioFrame, pacing bool) error {
-	if s.ctx.Err() != nil {
-		return ErrSessionClosed
-	}
-
-	s.sendMutex.Lock()
-	defer s.sendMutex.Unlock()
-
-	switch f := frame.(type) {
-	case *core.OpusFrame:
-		return s.sendOpusFrame(f, pacing)
-	case *core.PCMFrame:
-		return s.sendPCMFrame(f, pacing)
-	default:
-		return ErrUnsupportedFrameType
-	}
-}
-
-func (s *Session) sendPCMFrame(frame *core.PCMFrame, pacing bool) error {
-	data := frame.PCMData
-
-	if frame.SampleRate() != OpusClockRate {
-		data = helper.ResampleLinear(data, frame.SampleRate(), OpusClockRate, &s.resampleLastSample)
-	}
-
-	offset := 0
-	for offset < len(data) {
-		space := OpusFrameSamples - s.outBufLen
-		remaining := len(data) - offset
-
-		n := space
-		if remaining < n {
-			n = remaining
-		}
-
-		copy(s.outBuf[s.outBufLen:], data[offset:offset+n])
-		s.outBufLen += n
-		offset += n
-
-		if s.outBufLen == OpusFrameSamples {
-			if err := s.encodeAndSend(pacing); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s *Session) paceWrite() {
-	s.tokenBucket.Take()
-}
-
-func (s *Session) sendOpusFrame(frame *core.OpusFrame, pacing bool) error {
-	if pacing {
-		s.paceWrite()
-	}
-
-	return s.outTrack.WriteSample(media.Sample{
-		Data:     frame.OpusData,
-		Duration: OpusFrameDuration,
-	})
-}
-
-func (s *Session) encodeAndSend(pacing bool) error {
-	encoded := make([]byte, OpusMaxEncodedFrameSize)
-
-	n, err := s.encoder.Encode(s.outBuf, encoded)
-	if err != nil {
-		s.outBufLen = 0
-		return errors.Join(ErrOpusEncode, err)
-	}
-
-	s.outBufLen = 0
-
-	if pacing {
-		s.paceWrite()
-	}
-
-	return s.outTrack.WriteSample(media.Sample{
-		Data:     encoded[:n],
-		Duration: OpusFrameDuration,
-	})
-}
-
-func (s *Session) SendMessage(text string) error {
-	if s.ctx.Err() != nil {
-		return ErrSessionClosed
-	}
-
-	dc := s.messageDataChannel.Load()
-	if dc == nil {
-		return ErrDataChannelNotOpen
-	}
-
-	return dc.SendText(text)
-}
-
-func (s *Session) Done() <-chan struct{} {
-	return s.ctx.Done()
-}
-
-func (s *Session) closeAsync() {
-	go s.Close(context.Background())
-}
-
-func (s *Session) Close(ctx context.Context) error {
-	var closeErr error
-
-	s.once.Do(func() {
-		s.cancel()
-
-		pcErr := s.pc.Close()
-		wgErr := helper.WaitWithCtx(ctx, &s.trackWg)
-
-		close(s.audioIn)
-		close(s.messageIn)
-
-		closeErr = errors.Join(pcErr, wgErr)
-	})
-
-	return closeErr
-}
-
 func (s *Session) setupCallbacks() {
 	s.pc.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
-		if track.Codec().MimeType != webrtc.MimeTypeOpus {
-			return
-		}
-
-		s.trackWg.Add(1)
-		go s.handleAudioTrack(track)
+		s.receiver.OnTrack(track)
 	})
 
 	s.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
@@ -282,7 +186,7 @@ func (s *Session) setupCallbacks() {
 
 		switch state {
 		case webrtc.ICEConnectionStateConnected:
-			s.connectedOnce.Do(func() { close(s.connected) })
+			s.connOnce.Do(func() { close(s.connected) })
 		case webrtc.ICEConnectionStateDisconnected,
 			webrtc.ICEConnectionStateFailed,
 			webrtc.ICEConnectionStateClosed:
@@ -290,127 +194,12 @@ func (s *Session) setupCallbacks() {
 		}
 	})
 
-	if s.messageChannelName != "" {
+	if s.messaging != nil {
 		s.pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-			if dc.Label() != s.messageChannelName {
+			if dc.Label() != s.messaging.channelName {
 				return
 			}
-			s.setupMessageDataChannelCallbacks(dc)
+			s.messaging.setupCallbacks(dc)
 		})
-	}
-}
-
-func (s *Session) setupMessageDataChannelCallbacks(dc *webrtc.DataChannel) {
-	dc.OnOpen(func() {
-		s.messageDataChannel.Store(dc)
-		s.messageReadyOnce.Do(func() { close(s.messageReady) })
-		s.logger.Info("data channel opened")
-	})
-
-	dc.OnClose(func() {
-		s.messageDataChannel.Store(nil)
-		s.logger.Info("data channel closed")
-	})
-
-	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-		if msg.IsString {
-			select {
-			case s.messageIn <- string(msg.Data):
-			case <-s.ctx.Done():
-			default:
-				s.logger.Warn("text input channel full, dropping message")
-			}
-		}
-	})
-}
-
-func (s *Session) handleAudioTrack(track *webrtc.TrackRemote) {
-	defer s.trackWg.Done()
-
-	switch s.audioInEncoding {
-	case AudioInEncodingOpus:
-		s.handleAudioTrackOpus(track)
-	default:
-		s.handleAudioTrackPCM(track)
-	}
-}
-
-func (s *Session) handleAudioTrackPCM(track *webrtc.TrackRemote) {
-	decoder, err := opus.NewDecoder(OpusClockRate, PCMDecoderChannels)
-	if err != nil {
-		s.logger.Error("failed to create Opus decoder", "error", err)
-		return
-	}
-
-	pcmBuffer := make([]int16, PCMBufferSize)
-
-	for {
-		rtpPacket, _, err := track.ReadRTP()
-		if err != nil {
-			if err != io.EOF {
-				s.logger.Error("error reading RTP", "error", err)
-			}
-			return
-		}
-
-		if len(rtpPacket.Payload) == 0 {
-			continue
-		}
-
-		n, err := decoder.Decode(rtpPacket.Payload, pcmBuffer)
-		if err != nil {
-			s.logger.Warn("error decoding Opus", "error", err)
-			continue
-		}
-
-		pcmData := make([]int16, n)
-		copy(pcmData, pcmBuffer[:n])
-
-		frame := &core.PCMFrame{
-			PCMData:      pcmData,
-			SampleRateHz: OpusClockRate,
-			NumChannels:  PCMDecoderChannels,
-		}
-
-		select {
-		case s.audioIn <- frame:
-		case <-s.ctx.Done():
-			return
-		default:
-			s.logger.Warn("audio input channel full, dropping audio frame")
-		}
-	}
-}
-
-func (s *Session) handleAudioTrackOpus(track *webrtc.TrackRemote) {
-	for {
-		rtpPacket, _, err := track.ReadRTP()
-		if err != nil {
-			if err != io.EOF {
-				s.logger.Error("error reading RTP", "error", err)
-			}
-			return
-		}
-
-		if len(rtpPacket.Payload) == 0 {
-			continue
-		}
-
-		opusData := make([]byte, len(rtpPacket.Payload))
-		copy(opusData, rtpPacket.Payload)
-
-		frame := &core.OpusFrame{
-			OpusData:     opusData,
-			SampleRateHz: OpusClockRate,
-			NumChannels:  OpusChannels,
-		}
-
-		select {
-		case s.audioIn <- frame:
-		case <-s.ctx.Done():
-			return
-		default:
-			s.logger.Warn("audio input channel full, dropping audio frame")
-		}
 	}
 }
