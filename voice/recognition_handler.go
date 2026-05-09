@@ -37,6 +37,10 @@ func newRecognitionHandler(config recognitionHandlerConfig) *recognitionHandler 
 }
 
 func (r *recognitionHandler) OnSpeechStart() {
+	if !r.responder.IsInterruptible() {
+		return
+	}
+
 	r.stopInterruptTimer()
 
 	if r.minInterruptDuration <= 0 {
@@ -52,6 +56,10 @@ func (r *recognitionHandler) OnSpeechStart() {
 }
 
 func (r *recognitionHandler) OnInterim() {
+	if !r.responder.IsInterruptible() {
+		return
+	}
+
 	if !r.interruptOnInterim {
 		return
 	}
@@ -64,6 +72,10 @@ func (r *recognitionHandler) OnSpeechEnd() {
 }
 
 func (r *recognitionHandler) OnSpeechRecognized(transcripts []Transcript) {
+	if !r.responder.IsInterruptible() {
+		return
+	}
+
 	prompt := combineTranscripts(transcripts)
 
 	r.stopInterruptTimer()

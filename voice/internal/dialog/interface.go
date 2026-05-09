@@ -18,4 +18,5 @@ type Brain interface {
 type Tools interface {
 	AddFiller(token core.Token)
 	PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error)
+	SetInterruptible(interruptible bool)
 }

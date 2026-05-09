@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
@@ -46,6 +47,8 @@ type Responder struct {
 	mixer     *mixer
 	logger    *slog.Logger
 
+	interruptible atomic.Bool
+
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
 	wg         *sync.WaitGroup
@@ -82,6 +85,8 @@ func NewResponder(config ResponderConfig) *Responder {
 		wg:                    wg,
 	}
 
+	r.interruptible.Store(true)
+
 	wg.Add(2)
 
 	go func() {
@@ -105,6 +110,14 @@ func (r *Responder) Close(ctx context.Context) error {
 		r.mixer.Close(ctx),
 		helper.WaitWithCtx(ctx, r.wg),
 	)
+}
+
+func (r *Responder) SetInterruptible(interruptible bool) {
+	r.interruptible.Store(interruptible)
+}
+
+func (r *Responder) IsInterruptible() bool {
+	return r.interruptible.Load()
 }
 
 func (r *Responder) IceBreaking() {
@@ -177,6 +190,8 @@ func (r *Responder) createResponseContext() context.Context {
 }
 
 func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGroup) {
+	r.interruptible.Store(true)
+
 	synthIn := make(chan core.Token, r.synthInBufferSize)
 	tokenOut := make(chan core.Token, r.outputTokenBufferSize)
 	brainOut := make(chan core.Token, r.brainBufferSize)
@@ -189,7 +204,9 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 	go func() {
 		defer wg.Done()
 		defer close(brainOut)
-		tools := newTools(brainOut, r.mixer)
+
+		tools := newTools(brainOut, r.mixer, r)
+
 		if err := r.brain.Generate(ctx, prompt, tools, brainOut); err != nil {
 			r.sendError(ctx, err)
 		}
@@ -198,6 +215,8 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 	go func() {
 		defer wg.Done()
 		defer close(synthOut)
+		defer r.interruptible.Store(true)
+
 		if err := r.synthesizer.Synthesize(ctx, synthIn, synthOut); err != nil {
 			r.sendError(ctx, err)
 		}

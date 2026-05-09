@@ -8,6 +8,7 @@ import (
 type DialogTools interface {
 	AddFiller(token Token)
 	PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error)
+	SetInterruptible(interruptible bool)
 }
 
 type Brain interface {
