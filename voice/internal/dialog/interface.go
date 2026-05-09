@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"context"
+	"github.com/josephnhtam/live-agent-go/voice/audio"
 	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 )
 
@@ -16,10 +17,5 @@ type Brain interface {
 
 type Tools interface {
 	AddFiller(token core.Token)
-	PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error)
-}
-
-type AudioHandle interface {
-	SetVolume(v float64)
-	Stop()
+	PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error)
 }

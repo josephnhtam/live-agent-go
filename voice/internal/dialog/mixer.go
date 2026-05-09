@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"context"
+	"github.com/josephnhtam/live-agent-go/voice/audio"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -18,8 +19,8 @@ const (
 )
 
 type bgTrack struct {
-	wave     *Wave
-	opts     *AudioOptions
+	wave     *audio.Wave
+	opts     *audio.Options
 	position int
 	volume   float64
 	stopped  atomic.Bool
@@ -92,7 +93,7 @@ func (m *mixer) SetSpeechSource(ch <-chan core.AudioFrame) {
 	}
 }
 
-func (m *mixer) AddTrack(wave *Wave, opts *AudioOptions) (*bgTrack, error) {
+func (m *mixer) AddTrack(wave *audio.Wave, opts *audio.Options) (*bgTrack, error) {
 	if wave == nil {
 		return nil, ErrNilWave
 	}
@@ -102,7 +103,7 @@ func (m *mixer) AddTrack(wave *Wave, opts *AudioOptions) (*bgTrack, error) {
 	}
 
 	if opts == nil {
-		opts = NewAudioOptions()
+		opts = audio.NewOptions()
 	}
 
 	track := &bgTrack{
@@ -340,7 +341,7 @@ func (m *mixer) mixTracks(mixed []int32, speechPlaying bool) {
 
 		samples := m.readTrackSamples(track, length, speechPlaying)
 
-		if len(samples) == 0 && track.position >= len(track.wave.samples) && !track.opts.Loop() {
+		if len(samples) == 0 && track.position >= len(track.wave.Samples()) && !track.opts.Loop() {
 			continue
 		}
 
@@ -348,7 +349,7 @@ func (m *mixer) mixTracks(mixed []int32, speechPlaying bool) {
 			mixed[idx] += int32(sample)
 		}
 
-		if track.position >= len(track.wave.samples) && !track.opts.Loop() {
+		if track.position >= len(track.wave.Samples()) && !track.opts.Loop() {
 			continue
 		}
 
@@ -363,8 +364,8 @@ func (m *mixer) mixTracks(mixed []int32, speechPlaying bool) {
 }
 
 func (m *mixer) readTrackSamples(track *bgTrack, length int, speechPlaying bool) []int16 {
-	wave := track.wave
-	waveLen := len(wave.samples)
+	samples := track.wave.Samples()
+	waveLen := len(samples)
 
 	if waveLen == 0 {
 		return nil
@@ -382,7 +383,7 @@ func (m *mixer) readTrackSamples(track *bgTrack, length int, speechPlaying bool)
 			}
 		}
 
-		out[idx] = wave.samples[track.position]
+		out[idx] = samples[track.position]
 		track.position++
 	}
 

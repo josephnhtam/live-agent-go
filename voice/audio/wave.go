@@ -1,4 +1,4 @@
-package dialog
+package audio
 
 import (
 	"bytes"

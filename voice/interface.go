@@ -2,14 +2,12 @@ package voice
 
 import (
 	"context"
-	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
+	"github.com/josephnhtam/live-agent-go/voice/audio"
 )
-
-type AudioHandle = dialog.AudioHandle
 
 type DialogTools interface {
 	AddFiller(token Token)
-	PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error)
+	PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error)
 }
 
 type Brain interface {

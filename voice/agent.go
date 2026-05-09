@@ -195,21 +195,12 @@ func validateAgentConfig(config AgentConfig) error {
 	return nil
 }
 
-type dialogToolsAdapter struct {
-	dialog.Tools
-}
-
-func (d *dialogToolsAdapter) PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error) {
-	return d.Tools.PlayAudio(wave, opts)
-}
-
 type brainAdapter struct {
 	Brain
 }
 
-var _ DialogTools = (*dialogToolsAdapter)(nil)
 var _ dialog.Brain = (*brainAdapter)(nil)
 
 func (b brainAdapter) Generate(ctx context.Context, prompt string, tools dialog.Tools, tokens chan<- core.Token) error {
-	return b.Brain.Generate(ctx, prompt, &dialogToolsAdapter{tools}, tokens)
+	return b.Brain.Generate(ctx, prompt, tools, tokens)
 }

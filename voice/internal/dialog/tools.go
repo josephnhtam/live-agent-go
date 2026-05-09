@@ -1,6 +1,9 @@
 package dialog
 
-import "github.com/josephnhtam/live-agent-go/voice/internal/core"
+import (
+	"github.com/josephnhtam/live-agent-go/voice/audio"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
+)
 
 type tools struct {
 	tokenOut chan<- core.Token
@@ -20,6 +23,6 @@ func (t *tools) AddFiller(token core.Token) {
 	t.tokenOut <- token
 }
 
-func (t *tools) PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error) {
+func (t *tools) PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error) {
 	return t.mixer.AddTrack(wave, opts)
 }
