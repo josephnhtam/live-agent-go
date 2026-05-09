@@ -37,7 +37,7 @@ func (m *Manager) AcceptOffer(ctx context.Context, offerSDP string) (string, voi
 	defer func() {
 		if !success {
 			if session != nil {
-				_ = session.Close()
+				_ = session.Close(context.Background())
 			} else {
 				_ = pc.Close()
 			}

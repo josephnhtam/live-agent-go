@@ -11,5 +11,15 @@ type Synthesizer interface {
 }
 
 type Brain interface {
-	Generate(ctx context.Context, prompt string, tokens chan<- core.Token) error
+	Generate(ctx context.Context, prompt string, tools Tools, tokens chan<- core.Token) error
+}
+
+type Tools interface {
+	AddFiller(token core.Token)
+	PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error)
+}
+
+type AudioHandle interface {
+	SetVolume(v float64)
+	Stop()
 }

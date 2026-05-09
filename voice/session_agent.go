@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
+
 	"github.com/josephnhtam/live-agent-go/voice/helper"
 	"github.com/josephnhtam/live-agent-go/voice/transport"
 	"golang.org/x/sync/errgroup"
-	"log/slog"
 )
 
 type MessageRole string
@@ -116,7 +117,7 @@ func (a *SessionAgent) Run(ctx context.Context) error {
 
 	grp.Go(func() error {
 		select {
-		case err := <-a.agent.Done():
+		case err := <-a.agent.Err():
 			return err
 		case <-grpCtx.Done():
 			return grpCtx.Err()
@@ -148,7 +149,7 @@ func (a *SessionAgent) Run(ctx context.Context) error {
 
 func (a *SessionAgent) Close(ctx context.Context) error {
 	agentErr := a.agent.Stop(ctx)
-	sessionErr := a.session.Close()
+	sessionErr := a.session.Close(ctx)
 	return errors.Join(agentErr, sessionErr)
 }
 
@@ -185,7 +186,7 @@ func (a *SessionAgent) outboundAudioLoop(ctx context.Context) error {
 				continue
 			}
 
-			if err := a.session.SendAudio(frame, true); err != nil {
+			if err := a.session.SendAudio(frame, false); err != nil {
 				if errors.Is(err, transport.ErrSessionClosed) {
 					return err
 				}

@@ -3,13 +3,13 @@ package webrtc
 import (
 	"context"
 	"errors"
-	"github.com/josephnhtam/live-agent-go/voice"
-	"github.com/josephnhtam/live-agent-go/voice/helper"
-	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 	"io"
 	"log/slog"
 	"sync"
-	"time"
+
+	"github.com/josephnhtam/live-agent-go/voice"
+	"github.com/josephnhtam/live-agent-go/voice/helper"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -30,7 +30,7 @@ type Session struct {
 	encoder            *opus.Encoder
 	outBuf             []int16
 	outBufLen          int
-	nextSendTime       time.Time
+	tokenBucket        *helper.TokenBucket
 	resampleLastSample int16
 	audioInEncoding    AudioInEncoding
 	messageChannelName string
@@ -90,6 +90,7 @@ func newSession(
 		outTrack:           outTrack,
 		encoder:            encoder,
 		outBuf:             make([]int16, OpusFrameSamples),
+		tokenBucket:        helper.NewTokenBucket(OpusFrameDuration, options.pacingBurst),
 		audioInEncoding:    options.audioInEncoding,
 		messageChannelName: options.messageChannelName,
 		messageReady:       make(chan struct{}),
@@ -160,11 +161,7 @@ func (s *Session) sendPCMFrame(frame *core.PCMFrame, pacing bool) error {
 }
 
 func (s *Session) paceWrite() {
-	now := time.Now()
-	if !s.nextSendTime.IsZero() && now.Before(s.nextSendTime) {
-		time.Sleep(s.nextSendTime.Sub(now))
-	}
-	s.nextSendTime = time.Now().Add(OpusFrameDuration)
+	s.tokenBucket.Take()
 }
 
 func (s *Session) sendOpusFrame(frame *core.OpusFrame, pacing bool) error {
@@ -215,20 +212,22 @@ func (s *Session) Done() <-chan struct{} {
 	return s.ctx.Done()
 }
 
-func (s *Session) Close() error {
-	var pcErr error
+func (s *Session) Close(ctx context.Context) error {
+	var closeErr error
 
 	s.once.Do(func() {
 		s.cancel()
-		s.trackWg.Wait()
+
+		pcErr := s.pc.Close()
+		wgErr := helper.WaitWithCtx(ctx, &s.trackWg)
 
 		close(s.audioIn)
 		close(s.messageIn)
 
-		pcErr = s.pc.Close()
+		closeErr = errors.Join(pcErr, wgErr)
 	})
 
-	return pcErr
+	return closeErr
 }
 
 func (s *Session) setupCallbacks() {
@@ -248,7 +247,7 @@ func (s *Session) setupCallbacks() {
 		case webrtc.ICEConnectionStateDisconnected,
 			webrtc.ICEConnectionStateFailed,
 			webrtc.ICEConnectionStateClosed:
-			go s.Close()
+			go s.Close(context.Background())
 		}
 	})
 

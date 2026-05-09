@@ -19,6 +19,7 @@ type ManagerOptions struct {
 	messageBufferSize  int
 	messageChannelName string
 	audioInEncoding    AudioInEncoding
+	pacingBurst        int
 	logger             *slog.Logger
 }
 
@@ -26,6 +27,7 @@ func NewManagerOptions() *ManagerOptions {
 	return &ManagerOptions{
 		audioBufferSize:   128,
 		messageBufferSize: 16,
+		pacingBurst:       3,
 	}
 }
 
@@ -51,6 +53,11 @@ func (o *ManagerOptions) WithMessageChannel(name string) *ManagerOptions {
 
 func (o *ManagerOptions) WithAudioInEncoding(encoding AudioInEncoding) *ManagerOptions {
 	o.audioInEncoding = encoding
+	return o
+}
+
+func (o *ManagerOptions) WithPacingBurst(n int) *ManagerOptions {
+	o.pacingBurst = n
 	return o
 }
 

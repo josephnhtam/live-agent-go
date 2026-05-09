@@ -3,6 +3,7 @@ package voice
 import (
 	"context"
 	"errors"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -34,7 +35,7 @@ type Agent struct {
 	recognizer         *speech.Recognizer
 	recognitionHandler *recognitionHandler
 
-	done    chan error
+	errCh   chan error
 	lock    sync.Mutex
 	started atomic.Bool
 	stopped atomic.Bool
@@ -67,6 +68,7 @@ func NewAgent(config AgentConfig, opts *AgentOptions) (*Agent, error) {
 		respTokenChs: options.respTokenChs,
 		respErrChs:   options.respErrChs,
 		promptChs:    options.promptChs,
+		errCh:        make(chan error, 1),
 		lock:         sync.Mutex{},
 		started:      atomic.Bool{},
 		stopped:      atomic.Bool{},
@@ -75,12 +77,12 @@ func NewAgent(config AgentConfig, opts *AgentOptions) (*Agent, error) {
 
 func (a *Agent) start(ctx context.Context) error {
 	a.responder = dialog.NewResponder(dialog.ResponderConfig{
-		Ctx:                   a.ctx,
-		Brain:                 a.config.Brain,
+		Brain:                 &brainAdapter{a.config.Brain},
 		Synthesizer:           a.config.Synthesizer,
 		BrainBufferSize:       a.options.brainBufferSize,
-		SynthesizerBufferSize: a.options.synthesizerBufferSize,
-		SynTokenBufferSize:    a.options.synTokenBufferSize,
+		MixerOutBufferSize:    a.options.mixerBufferSize,
+		SynthOutBufferSize:    a.options.synthOutBufferSize,
+		SynthInBufferSize:     a.options.synthInBufferSize,
 		OutputTokenBufferSize: a.options.outputTokenBufferSize,
 		AudioChs:              a.respAudioChs,
 		TokenChs:              a.respTokenChs,
@@ -108,13 +110,12 @@ func (a *Agent) start(ctx context.Context) error {
 		return errors.Join(ErrStartingRecognizer, err)
 	}
 
-	a.done = make(chan error, 1)
 	go func() {
 		select {
-		case err := <-a.recognizer.Done():
-			a.done <- err
+		case err := <-a.recognizer.Err():
+			a.errCh <- err
 		case <-a.ctx.Done():
-			a.done <- a.ctx.Err()
+			a.errCh <- a.ctx.Err()
 		}
 	}()
 
@@ -125,14 +126,13 @@ func (a *Agent) IceBreaking() {
 	a.responder.IceBreaking()
 }
 
-func (a *Agent) Done() <-chan error {
-	return a.done
+func (a *Agent) Err() <-chan error {
+	return a.errCh
 }
 
 func (a *Agent) stop(ctx context.Context) error {
 	a.cancel()
-	a.responder.CancelResponse()
-	return a.recognizer.Stop(ctx)
+	return errors.Join(a.responder.Close(ctx), a.recognizer.Stop(ctx))
 }
 
 func (a *Agent) Feed(ctx context.Context, frame AudioFrame) error {
@@ -175,12 +175,8 @@ func (a *Agent) Stop(ctx context.Context) error {
 		return ErrAlreadyStopped
 	}
 
-	if err := a.stop(ctx); err != nil {
-		return err
-	}
-
 	a.stopped.Store(true)
-	return nil
+	return a.stop(ctx)
 }
 
 func validateAgentConfig(config AgentConfig) error {
@@ -197,4 +193,23 @@ func validateAgentConfig(config AgentConfig) error {
 	}
 
 	return nil
+}
+
+type dialogToolsAdapter struct {
+	dialog.Tools
+}
+
+func (d *dialogToolsAdapter) PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error) {
+	return d.Tools.PlayAudio(wave, opts)
+}
+
+type brainAdapter struct {
+	Brain
+}
+
+var _ DialogTools = (*dialogToolsAdapter)(nil)
+var _ dialog.Brain = (*brainAdapter)(nil)
+
+func (b brainAdapter) Generate(ctx context.Context, prompt string, tools dialog.Tools, tokens chan<- core.Token) error {
+	return b.Brain.Generate(ctx, prompt, &dialogToolsAdapter{tools}, tokens)
 }

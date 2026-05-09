@@ -14,16 +14,22 @@ type AgentOptions struct {
 	minInterruptDuration  time.Duration
 	interruptOnInterim    bool
 	brainBufferSize       int
-	synthesizerBufferSize int
-	synTokenBufferSize    int
+	mixerBufferSize       int
+	synthOutBufferSize    int
+	synthInBufferSize     int
 	outputTokenBufferSize int
 	logger                *slog.Logger
 }
 
 func NewAgentOptions() *AgentOptions {
 	return &AgentOptions{
-		minInterruptDuration: 300 * time.Millisecond,
-		interruptOnInterim:   true,
+		minInterruptDuration:  300 * time.Millisecond,
+		interruptOnInterim:    true,
+		brainBufferSize:       32,
+		mixerBufferSize:       32,
+		synthOutBufferSize:    32,
+		synthInBufferSize:     32,
+		outputTokenBufferSize: 32,
 	}
 }
 
@@ -67,13 +73,18 @@ func (o *AgentOptions) WithBrainBufferSize(size int) *AgentOptions {
 	return o
 }
 
-func (o *AgentOptions) WithSynthesizerBufferSize(size int) *AgentOptions {
-	o.synthesizerBufferSize = size
+func (o *AgentOptions) WithMixerBufferSize(size int) *AgentOptions {
+	o.mixerBufferSize = size
 	return o
 }
 
-func (o *AgentOptions) WithSynTokenBufferSize(size int) *AgentOptions {
-	o.synTokenBufferSize = size
+func (o *AgentOptions) WithSynthOutBufferSize(size int) *AgentOptions {
+	o.synthOutBufferSize = size
+	return o
+}
+
+func (o *AgentOptions) WithSynthInBufferSize(size int) *AgentOptions {
+	o.synthInBufferSize = size
 	return o
 }
 

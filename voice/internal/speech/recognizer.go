@@ -25,8 +25,8 @@ type Recognizer struct {
 	cancel context.CancelFunc
 	grp    *errgroup.Group
 
-	ch   chan any
-	done chan error
+	bufferCh chan any
+	errCh    chan error
 }
 
 func NewRecognizer(config RecognizerConfig) *Recognizer {
@@ -37,9 +37,10 @@ func NewRecognizer(config RecognizerConfig) *Recognizer {
 		transcriber: config.Transcriber,
 		handler:     config.Handler,
 
-		ctx:    ctx,
-		cancel: cancel,
-		ch:     make(chan any, bufferSize),
+		ctx:      ctx,
+		cancel:   cancel,
+		bufferCh: make(chan any, bufferSize),
+		errCh:    make(chan error, 1),
 	}
 }
 
@@ -74,7 +75,7 @@ func (r *Recognizer) Start(ctx context.Context) error {
 				}
 
 				select {
-				case r.ch <- vadEvent:
+				case r.bufferCh <- vadEvent:
 				case <-ctx.Done():
 					return nil
 				}
@@ -85,7 +86,7 @@ func (r *Recognizer) Start(ctx context.Context) error {
 				}
 
 				select {
-				case r.ch <- transcript:
+				case r.bufferCh <- transcript:
 				case <-ctx.Done():
 					return nil
 				}
@@ -97,16 +98,15 @@ func (r *Recognizer) Start(ctx context.Context) error {
 		return r.handleEvent(ctx)
 	})
 
-	r.done = make(chan error, 1)
 	go func() {
-		r.done <- r.grp.Wait()
+		r.errCh <- r.grp.Wait()
 	}()
 
 	return nil
 }
 
-func (r *Recognizer) Done() <-chan error {
-	return r.done
+func (r *Recognizer) Err() <-chan error {
+	return r.errCh
 }
 
 func (r *Recognizer) Stop(ctx context.Context) error {
@@ -157,7 +157,7 @@ func (r *Recognizer) handleEvent(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 
-		case evt := <-r.ch:
+		case evt := <-r.bufferCh:
 			switch v := evt.(type) {
 			case VADEvent:
 				if v == VADEventSpeechStart {

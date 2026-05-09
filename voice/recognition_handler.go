@@ -1,11 +1,13 @@
 package voice
 
 import (
-	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
-	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
+	"context"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
+	"github.com/josephnhtam/live-agent-go/voice/internal/speech"
 )
 
 type recognitionHandlerConfig struct {
@@ -38,12 +40,14 @@ func (r *recognitionHandler) OnSpeechStart() {
 	r.stopInterruptTimer()
 
 	if r.minInterruptDuration <= 0 {
-		r.responder.CancelResponse()
+		r.responder.CancelResponse(context.Background())
 		return
 	}
 
 	r.mutex.Lock()
-	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, r.responder.CancelResponse)
+	r.interruptTimer = time.AfterFunc(r.minInterruptDuration, func() {
+		r.responder.CancelResponse(context.Background())
+	})
 	r.mutex.Unlock()
 }
 
@@ -52,7 +56,7 @@ func (r *recognitionHandler) OnInterim() {
 		return
 	}
 
-	r.responder.CancelResponse()
+	r.responder.CancelResponse(context.Background())
 }
 
 func (r *recognitionHandler) OnSpeechEnd() {

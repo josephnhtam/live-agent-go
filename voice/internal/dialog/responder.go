@@ -2,22 +2,23 @@ package dialog
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
 
-	"github.com/josephnhtam/live-agent-go/voice/internal/core"
-
 	"github.com/google/uuid"
+	"github.com/josephnhtam/live-agent-go/voice/helper"
+	"github.com/josephnhtam/live-agent-go/voice/internal/core"
 )
 
 type ResponderConfig struct {
-	Ctx                   context.Context
 	Brain                 Brain
 	Synthesizer           Synthesizer
 	BrainBufferSize       int
-	SynthesizerBufferSize int
-	SynTokenBufferSize    int
+	MixerOutBufferSize    int
+	SynthOutBufferSize    int
+	SynthInBufferSize     int
 	OutputTokenBufferSize int
 
 	AudioChs  []chan<- core.AudioFrame
@@ -29,21 +30,25 @@ type ResponderConfig struct {
 
 type Responder struct {
 	ctx                   context.Context
+	cancel                context.CancelFunc
 	brain                 Brain
 	synthesizer           Synthesizer
 	brainBufferSize       int
-	synthesizerBufferSize int
-	synTokenBufferSize    int
+	mixerOutBufferSize    int
+	synthOutBufferSize    int
+	synthInBufferSize     int
 	outputTokenBufferSize int
 
 	audioChs  []chan<- core.AudioFrame
 	tokenChs  []chan<- core.Token
 	errChs    []chan<- error
 	promptChs []chan<- core.Prompt
+	mixer     *mixer
 	logger    *slog.Logger
 
 	mutex      sync.Mutex
 	cancelResp context.CancelFunc
+	wg         *sync.WaitGroup
 	respWg     *sync.WaitGroup
 }
 
@@ -53,31 +58,57 @@ func NewResponder(config ResponderConfig) *Responder {
 		logger = slog.Default()
 	}
 
-	return &Responder{
-		ctx:                   config.Ctx,
+	mixerOut := make(chan core.AudioFrame, config.MixerOutBufferSize)
+	mixer := newMixer(mixerOut, config.Synthesizer.SampleRate(), logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+
+	r := &Responder{
+		ctx:                   ctx,
+		cancel:                cancel,
 		brain:                 config.Brain,
 		synthesizer:           config.Synthesizer,
-		brainBufferSize:       bufferSize(config.BrainBufferSize, 32),
-		synthesizerBufferSize: bufferSize(config.SynthesizerBufferSize, 32),
-		synTokenBufferSize:    bufferSize(config.SynTokenBufferSize, 32),
-		outputTokenBufferSize: bufferSize(config.OutputTokenBufferSize, 32),
+		brainBufferSize:       config.BrainBufferSize,
+		synthOutBufferSize:    config.SynthOutBufferSize,
+		synthInBufferSize:     config.SynthInBufferSize,
+		outputTokenBufferSize: config.OutputTokenBufferSize,
 		audioChs:              config.AudioChs,
 		tokenChs:              config.TokenChs,
 		errChs:                config.ErrChs,
 		promptChs:             config.PromptChs,
+		mixer:                 mixer,
 		logger:                logger.WithGroup("responder"),
+		wg:                    wg,
 	}
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		mixer.Run()
+	}()
+
+	go func() {
+		defer wg.Done()
+		r.consumeAudios(mixerOut)
+	}()
+
+	return r
 }
 
-func bufferSize(size, fallback int) int {
-	if size <= 0 {
-		return fallback
-	}
-	return size
+func (r *Responder) Close(ctx context.Context) error {
+	r.cancel()
+
+	return errors.Join(
+		r.CancelResponse(ctx),
+		r.mixer.Close(ctx),
+		helper.WaitWithCtx(ctx, r.wg),
+	)
 }
 
 func (r *Responder) IceBreaking() {
-	r.CancelResponse()
+	r.CancelResponse(context.Background())
 
 	ctx := r.createResponseContext()
 	wg := &sync.WaitGroup{}
@@ -93,7 +124,7 @@ func (r *Responder) Respond(prompt string) {
 		return
 	}
 
-	r.CancelResponse()
+	r.CancelResponse(context.Background())
 
 	ctx := r.createResponseContext()
 	wg := &sync.WaitGroup{}
@@ -113,7 +144,7 @@ func (r *Responder) Respond(prompt string) {
 	r.mutex.Unlock()
 }
 
-func (r *Responder) CancelResponse() {
+func (r *Responder) CancelResponse(ctx context.Context) error {
 	r.mutex.Lock()
 
 	cancel := r.cancelResp
@@ -126,42 +157,48 @@ func (r *Responder) CancelResponse() {
 
 	if cancel != nil {
 		cancel()
+		r.mixer.SetSpeechSource(nil)
 	}
 
 	if wg != nil {
-		wg.Wait()
+		return helper.WaitWithCtx(ctx, wg)
 	}
+
+	return nil
 }
 
 func (r *Responder) createResponseContext() context.Context {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	ctx, cancel := context.WithCancel(r.ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	r.cancelResp = cancel
 	return ctx
 }
 
 func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGroup) {
-	synthIn := make(chan core.Token, r.synTokenBufferSize)
+	synthIn := make(chan core.Token, r.synthInBufferSize)
 	tokenOut := make(chan core.Token, r.outputTokenBufferSize)
 	brainOut := make(chan core.Token, r.brainBufferSize)
-	audioOut := make(chan core.AudioFrame, r.synthesizerBufferSize)
+	synthOut := make(chan core.AudioFrame, r.synthOutBufferSize)
 
-	wg.Add(5)
+	wg.Add(4)
+
+	r.mixer.SetSpeechSource(synthOut)
 
 	go func() {
 		defer wg.Done()
 		defer close(brainOut)
-		if err := r.brain.Generate(ctx, prompt, brainOut); err != nil {
+		tools := newTools(brainOut, r.mixer)
+		if err := r.brain.Generate(ctx, prompt, tools, brainOut); err != nil {
 			r.sendError(ctx, err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		defer close(audioOut)
-		if err := r.synthesizer.Synthesize(ctx, synthIn, audioOut); err != nil {
+		defer close(synthOut)
+		if err := r.synthesizer.Synthesize(ctx, synthIn, synthOut); err != nil {
 			r.sendError(ctx, err)
 		}
 	}()
@@ -174,11 +211,6 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 	go func() {
 		defer wg.Done()
 		r.consumeTokens(ctx, tokenOut)
-	}()
-
-	go func() {
-		defer wg.Done()
-		r.consumeAudios(ctx, audioOut)
 	}()
 }
 
@@ -244,28 +276,24 @@ func (r *Responder) consumeTokens(ctx context.Context, tokenOut <-chan core.Toke
 	}
 }
 
-func (r *Responder) consumeAudios(ctx context.Context, audioOut <-chan core.AudioFrame) {
+func (r *Responder) consumeAudios(mixerOut <-chan core.AudioFrame) {
 	if len(r.audioChs) == 0 {
-		for range audioOut {
+		for range mixerOut {
 		}
 		return
 	}
 
-	for audio := range audioOut {
-		audio.SetContext(ctx)
-
+	for audio := range mixerOut {
 		for _, ch := range r.audioChs {
+			if r.ctx.Err() != nil {
+				return
+			}
+
 			select {
 			case ch <- audio:
-			case <-ctx.Done():
+			case <-r.ctx.Done():
+				return
 			}
 		}
-
-		if ctx.Err() != nil {
-			break
-		}
-	}
-
-	for range audioOut {
 	}
 }

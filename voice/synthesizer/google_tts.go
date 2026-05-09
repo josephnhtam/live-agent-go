@@ -2,6 +2,7 @@ package synthesizer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -92,7 +93,7 @@ func (s *GoogleSynthesizer) streamLoop(
 		})
 
 		grp.Go(func() error {
-			return s.recvLoop(grpCtx, stream, audioCh)
+			return s.recvLoop(grpCtx, ctx, stream, audioCh)
 		})
 
 		err = grp.Wait()
@@ -161,6 +162,10 @@ func (s *GoogleSynthesizer) sendLoop(
 	defer flushTimer.Stop()
 
 	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil
@@ -242,6 +247,7 @@ func (s *GoogleSynthesizer) sendText(
 
 func (s *GoogleSynthesizer) recvLoop(
 	ctx context.Context,
+	frameCtx context.Context,
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
 	audioCh chan<- voice.AudioFrame,
 ) error {
@@ -251,10 +257,12 @@ func (s *GoogleSynthesizer) recvLoop(
 		}
 
 		resp, err := stream.Recv()
+
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return fmt.Errorf("%w: %w", ErrRecv, err)
 		}
 
@@ -270,7 +278,7 @@ func (s *GoogleSynthesizer) recvLoop(
 			PCMData:      samples,
 			SampleRateHz: s.options.sampleRate,
 			NumChannels:  1,
-			Ctx:          ctx,
+			Ctx:          frameCtx,
 		}:
 		case <-ctx.Done():
 			return nil

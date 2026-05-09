@@ -2,10 +2,18 @@ package voice
 
 import (
 	"context"
+	"github.com/josephnhtam/live-agent-go/voice/internal/dialog"
 )
 
+type AudioHandle = dialog.AudioHandle
+
+type DialogTools interface {
+	AddFiller(token Token)
+	PlayAudio(wave *Wave, opts *AudioOptions) (AudioHandle, error)
+}
+
 type Brain interface {
-	Generate(ctx context.Context, prompt string, tokens chan<- Token) error
+	Generate(ctx context.Context, prompt string, tools DialogTools, tokens chan<- Token) error
 }
 
 type Synthesizer interface {
@@ -34,5 +42,5 @@ type Session interface {
 	SendAudio(frame AudioFrame, pacing bool) error
 	SendMessage(text string) error
 	Done() <-chan struct{}
-	Close() error
+	Close(ctx context.Context) error
 }
