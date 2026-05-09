@@ -22,7 +22,10 @@ func newTools(tokenOut chan<- core.Token, mixer *mixer, responder *Responder) *t
 var _ Tools = (*tools)(nil)
 
 func (t *tools) AddFiller(token core.Token) {
-	t.tokenOut <- token
+	select {
+	case t.tokenOut <- token:
+	default:
+	}
 }
 
 func (t *tools) PlayAudio(wave *audio.Wave, opts *audio.Options) (audio.Handle, error) {

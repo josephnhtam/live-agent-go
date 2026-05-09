@@ -18,6 +18,10 @@ func NewManager(apiFactory APIFactory, options *ManagerOptions) (*Manager, error
 		return nil, errors.Join(ErrCreateAPI, err)
 	}
 
+	if options == nil {
+		options = NewManagerOptions()
+	}
+
 	return &Manager{
 		api:     api,
 		options: options,

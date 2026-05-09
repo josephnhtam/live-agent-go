@@ -72,6 +72,9 @@ func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAg
 	agentOpts := config.AgentOptions
 	if agentOpts == nil {
 		agentOpts = NewAgentOptions()
+	} else {
+		cloned := *agentOpts
+		agentOpts = &cloned
 	}
 	agentOpts.SubscribeAudio(audioCh).
 		SubscribeToken(tokenCh).
@@ -208,8 +211,8 @@ func (a *SessionAgent) outboundAudioLoop(ctx context.Context) error {
 }
 
 func (a *SessionAgent) outboundTokenLoop(ctx context.Context) error {
-	if !a.waitForMessageReady(ctx) {
-		return ctx.Err()
+	if err := a.waitForMessageReady(ctx); err != nil {
+		return err
 	}
 
 	for {
@@ -243,8 +246,8 @@ func (a *SessionAgent) outboundTokenLoop(ctx context.Context) error {
 }
 
 func (a *SessionAgent) outboundPromptLoop(ctx context.Context) error {
-	if !a.waitForMessageReady(ctx) {
-		return ctx.Err()
+	if err := a.waitForMessageReady(ctx); err != nil {
+		return err
 	}
 
 	for {
@@ -277,13 +280,13 @@ func (a *SessionAgent) outboundPromptLoop(ctx context.Context) error {
 	}
 }
 
-func (a *SessionAgent) waitForMessageReady(ctx context.Context) bool {
+func (a *SessionAgent) waitForMessageReady(ctx context.Context) error {
 	select {
 	case <-a.session.MessageReady():
-		return true
+		return nil
 	case <-a.session.Done():
-		return false
+		return ErrSessionDone
 	case <-ctx.Done():
-		return false
+		return ctx.Err()
 	}
 }

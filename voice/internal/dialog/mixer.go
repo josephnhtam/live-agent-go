@@ -115,6 +115,7 @@ func (m *mixer) AddTrack(wave *audio.Wave, opts *audio.Options) (*bgTrack, error
 	select {
 	case m.trackCh <- track:
 	case <-m.ctx.Done():
+		return nil, m.ctx.Err()
 	}
 
 	return track, nil

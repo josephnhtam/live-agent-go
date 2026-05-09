@@ -82,8 +82,9 @@ func newSession(
 		return nil, errors.Join(ErrCreateOpusEncoder, err)
 	}
 
-	if options.logger == nil {
-		options.logger = helper.NoopLogger()
+	logger := options.logger
+	if logger == nil {
+		logger = helper.NoopLogger()
 	}
 
 	s := &Session{
@@ -92,7 +93,7 @@ func newSession(
 		messageIn:          make(chan string, options.messageBufferSize),
 		ctx:                ctx,
 		cancel:             cancel,
-		logger:             options.logger.WithGroup("webrtc_session"),
+		logger:             logger.WithGroup("webrtc_session"),
 		outTrack:           outTrack,
 		encoder:            encoder,
 		outBuf:             make([]int16, OpusFrameSamples),
