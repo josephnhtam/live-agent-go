@@ -98,6 +98,14 @@ func NewSessionAgent(session Session, config SessionAgentConfig, opts *SessionAg
 }
 
 func (a *SessionAgent) Run(ctx context.Context) error {
+	select {
+	case <-a.session.Connected():
+	case <-a.session.Done():
+		return ErrSessionDone
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	if err := a.agent.Start(ctx); err != nil {
 		return err
 	}
@@ -273,6 +281,8 @@ func (a *SessionAgent) waitForMessageReady(ctx context.Context) bool {
 	select {
 	case <-a.session.MessageReady():
 		return true
+	case <-a.session.Done():
+		return false
 	case <-ctx.Done():
 		return false
 	}

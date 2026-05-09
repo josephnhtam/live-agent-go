@@ -20,5 +20,6 @@ var (
 	ErrICEGatheringCancelled = errors.New("ICE gathering cancelled")
 	ErrSessionClosed         = transport.ErrSessionClosed
 	ErrDataChannelNotOpen    = transport.ErrMessageNotReady
+	ErrConnectionTimeout     = transport.ErrConnectionTimeout
 	ErrUnsupportedFrameType  = errors.New("unsupported audio frame type")
 )

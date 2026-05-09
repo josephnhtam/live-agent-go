@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/josephnhtam/live-agent-go/voice"
 	"github.com/josephnhtam/live-agent-go/voice/helper"
@@ -26,6 +28,7 @@ type Session struct {
 	once      sync.Once
 	logger    *slog.Logger
 
+	sendMutex          sync.Mutex
 	outTrack           *webrtc.TrackLocalStaticSample
 	encoder            *opus.Encoder
 	outBuf             []int16
@@ -34,8 +37,11 @@ type Session struct {
 	resampleLastSample int16
 	audioInEncoding    AudioInEncoding
 	messageChannelName string
-	dc                 *webrtc.DataChannel
+	messageDataChannel atomic.Pointer[webrtc.DataChannel]
 	messageReady       chan struct{}
+	connected          chan struct{}
+	connectedOnce      sync.Once
+	messageReadyOnce   sync.Once
 }
 
 var _ voice.Session = (*Session)(nil)
@@ -94,12 +100,30 @@ func newSession(
 		audioInEncoding:    options.audioInEncoding,
 		messageChannelName: options.messageChannelName,
 		messageReady:       make(chan struct{}),
+		connected:          make(chan struct{}),
 	}
 
 	s.setupCallbacks()
 
+	if options.connectionTimeout > 0 {
+		go s.connectionTimeoutLoop(options.connectionTimeout)
+	}
+
 	success = true
 	return s, nil
+}
+
+func (s *Session) connectionTimeoutLoop(timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-s.connected:
+	case <-s.ctx.Done():
+	case <-timer.C:
+		s.logger.Warn("connection timeout", "timeout", timeout)
+		s.closeAsync()
+	}
 }
 
 func (s *Session) AudioIn() <-chan core.AudioFrame {
@@ -114,10 +138,17 @@ func (s *Session) MessageReady() <-chan struct{} {
 	return s.messageReady
 }
 
+func (s *Session) Connected() <-chan struct{} {
+	return s.connected
+}
+
 func (s *Session) SendAudio(frame core.AudioFrame, pacing bool) error {
 	if s.ctx.Err() != nil {
 		return ErrSessionClosed
 	}
+
+	s.sendMutex.Lock()
+	defer s.sendMutex.Unlock()
 
 	switch f := frame.(type) {
 	case *core.OpusFrame:
@@ -201,15 +232,20 @@ func (s *Session) SendMessage(text string) error {
 		return ErrSessionClosed
 	}
 
-	if s.dc == nil {
+	dc := s.messageDataChannel.Load()
+	if dc == nil {
 		return ErrDataChannelNotOpen
 	}
 
-	return s.dc.SendText(text)
+	return dc.SendText(text)
 }
 
 func (s *Session) Done() <-chan struct{} {
 	return s.ctx.Done()
+}
+
+func (s *Session) closeAsync() {
+	go s.Close(context.Background())
 }
 
 func (s *Session) Close(ctx context.Context) error {
@@ -244,30 +280,34 @@ func (s *Session) setupCallbacks() {
 		s.logger.Info("ICE connection state changed", "state", state.String())
 
 		switch state {
+		case webrtc.ICEConnectionStateConnected:
+			s.connectedOnce.Do(func() { close(s.connected) })
 		case webrtc.ICEConnectionStateDisconnected,
 			webrtc.ICEConnectionStateFailed,
 			webrtc.ICEConnectionStateClosed:
-			go s.Close(context.Background())
+			s.closeAsync()
 		}
 	})
 
-	s.pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-		if dc.Label() != s.messageChannelName {
-			return
-		}
-		s.setupDataChannelCallbacks(dc)
-	})
+	if s.messageChannelName != "" {
+		s.pc.OnDataChannel(func(dc *webrtc.DataChannel) {
+			if dc.Label() != s.messageChannelName {
+				return
+			}
+			s.setupMessageDataChannelCallbacks(dc)
+		})
+	}
 }
 
-func (s *Session) setupDataChannelCallbacks(dc *webrtc.DataChannel) {
+func (s *Session) setupMessageDataChannelCallbacks(dc *webrtc.DataChannel) {
 	dc.OnOpen(func() {
-		s.dc = dc
-		close(s.messageReady)
+		s.messageDataChannel.Store(dc)
+		s.messageReadyOnce.Do(func() { close(s.messageReady) })
 		s.logger.Info("data channel opened")
 	})
 
 	dc.OnClose(func() {
-		s.dc = nil
+		s.messageDataChannel.Store(nil)
 		s.logger.Info("data channel closed")
 	})
 

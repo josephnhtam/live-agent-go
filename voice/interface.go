@@ -38,6 +38,7 @@ type Session interface {
 	AudioIn() <-chan AudioFrame
 	MessageIn() <-chan string
 	MessageReady() <-chan struct{}
+	Connected() <-chan struct{}
 	SendAudio(frame AudioFrame, pacing bool) error
 	SendMessage(text string) error
 	Done() <-chan struct{}

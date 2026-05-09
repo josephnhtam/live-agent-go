@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/pion/webrtc/v3"
 )
@@ -20,6 +21,7 @@ type ManagerOptions struct {
 	messageChannelName string
 	audioInEncoding    AudioInEncoding
 	pacingBurst        int
+	connectionTimeout  time.Duration
 	logger             *slog.Logger
 }
 
@@ -28,6 +30,7 @@ func NewManagerOptions() *ManagerOptions {
 		audioBufferSize:   128,
 		messageBufferSize: 16,
 		pacingBurst:       3,
+		connectionTimeout: 30 * time.Second,
 	}
 }
 
@@ -58,6 +61,11 @@ func (o *ManagerOptions) WithAudioInEncoding(encoding AudioInEncoding) *ManagerO
 
 func (o *ManagerOptions) WithPacingBurst(n int) *ManagerOptions {
 	o.pacingBurst = n
+	return o
+}
+
+func (o *ManagerOptions) WithConnectionTimeout(d time.Duration) *ManagerOptions {
+	o.connectionTimeout = d
 	return o
 }
 
