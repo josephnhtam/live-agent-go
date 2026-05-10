@@ -66,15 +66,11 @@ func (s *GoogleSynthesizer) streamLoop(
 	tokens <-chan voice.Token,
 	audioCh chan<- voice.AudioFrame,
 ) {
+	var pendingText string
+
 	for {
-		var firstToken voice.Token
-		select {
-		case token, ok := <-tokens:
-			if !ok {
-				return
-			}
-			firstToken = token
-		case <-ctx.Done():
+		firstToken, ok := s.nextToken(ctx, tokens, &pendingText)
+		if !ok {
 			return
 		}
 
@@ -87,10 +83,13 @@ func (s *GoogleSynthesizer) streamLoop(
 			return
 		}
 
+		var remaining string
 		grp, grpCtx := errgroup.WithContext(ctx)
 
 		grp.Go(func() error {
-			return s.sendLoop(grpCtx, stream, tokens, &firstToken)
+			var err error
+			remaining, err = s.sendLoop(grpCtx, stream, tokens, &firstToken)
+			return err
 		})
 
 		grp.Go(func() error {
@@ -98,6 +97,7 @@ func (s *GoogleSynthesizer) streamLoop(
 		})
 
 		err = grp.Wait()
+		pendingText = remaining
 
 		if ctx.Err() != nil {
 			return
@@ -108,6 +108,25 @@ func (s *GoogleSynthesizer) streamLoop(
 		}
 
 		s.logger.Warn("stream ended, reconnecting", "error", err)
+	}
+}
+
+func (s *GoogleSynthesizer) nextToken(
+	ctx context.Context,
+	tokens <-chan voice.Token,
+	pendingText *string,
+) (voice.Token, bool) {
+	if *pendingText != "" {
+		token := voice.Token{Text: *pendingText}
+		*pendingText = ""
+		return token, true
+	}
+
+	select {
+	case token, ok := <-tokens:
+		return token, ok
+	case <-ctx.Done():
+		return voice.Token{}, false
 	}
 }
 
@@ -147,15 +166,18 @@ func (s *GoogleSynthesizer) sendLoop(
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
 	tokens <-chan voice.Token,
 	firstToken *voice.Token,
-) error {
+) (remaining string, err error) {
 	defer stream.CloseSend()
 
 	sb := strings.Builder{}
+	defer func() {
+		remaining = sb.String()
+	}()
 
 	if firstToken != nil {
 		sb.WriteString(firstToken.Text)
 		if err := s.trySendSentence(&sb, stream); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -164,12 +186,12 @@ func (s *GoogleSynthesizer) sendLoop(
 
 	for {
 		if ctx.Err() != nil {
-			return nil
+			return "", nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return nil
+			return "", nil
 
 		case <-flushTimer.C:
 			s.flushText(&sb, stream)
@@ -178,12 +200,12 @@ func (s *GoogleSynthesizer) sendLoop(
 		case token, ok := <-tokens:
 			if !ok {
 				s.flushText(&sb, stream)
-				return nil
+				return "", nil
 			}
 
 			sb.WriteString(token.Text)
 			if err := s.trySendSentence(&sb, stream); err != nil {
-				return err
+				return "", err
 			}
 
 			flushTimer.Reset(s.options.flushTimeout)
