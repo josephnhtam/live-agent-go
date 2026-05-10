@@ -19,7 +19,7 @@ type GoogleSynthesizerOptions struct {
 
 func NewGoogleOptions() *GoogleSynthesizerOptions {
 	return &GoogleSynthesizerOptions{
-		sampleRate:       24000,
+		sampleRate:       48000,
 		sentenceEndRunes: defaultSentenceEndRunes,
 		flushTimeout:     4 * time.Second,
 	}
