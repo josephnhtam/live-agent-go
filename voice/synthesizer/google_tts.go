@@ -55,6 +55,7 @@ func (s *GoogleSynthesizer) Synthesize(ctx context.Context, tokens <-chan voice.
 	}
 
 	defer client.Close()
+
 	s.streamLoop(ctx, client, tokens, audioCh)
 	return nil
 }
@@ -171,13 +172,7 @@ func (s *GoogleSynthesizer) sendLoop(
 			return nil
 
 		case <-flushTimer.C:
-			if sb.Len() > 0 {
-				if err := s.sendText(sb.String(), stream); err != nil {
-					return fmt.Errorf("%w: %w", ErrSendInput, err)
-				}
-
-				sb.Reset()
-			}
+			s.flushText(&sb, stream)
 			flushTimer.Reset(s.options.flushTimeout)
 
 		case token, ok := <-tokens:
@@ -216,17 +211,18 @@ func (s *GoogleSynthesizer) trySendSentence(
 }
 
 func (s *GoogleSynthesizer) flushText(
-	buf *strings.Builder,
+	sb *strings.Builder,
 	stream texttospeechpb.TextToSpeech_StreamingSynthesizeClient,
 ) {
-	text := strings.TrimSpace(buf.String())
-	if text == "" {
+	if sb.Len() == 0 {
 		return
 	}
 
-	if err := s.sendText(text, stream); err != nil {
+	if err := s.sendText(sb.String(), stream); err != nil {
 		s.logger.Error("flush input", "error", err)
 	}
+
+	sb.Reset()
 }
 
 func (s *GoogleSynthesizer) sendText(
