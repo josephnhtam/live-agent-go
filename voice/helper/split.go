@@ -2,20 +2,24 @@ package helper
 
 func SplitAtSentenceEnd(text string, sentenceEndRunes []rune) (before string, after string, found bool) {
 	runes := []rune(text)
-	lastIdx := -1
+	firstIdx := -1
 
 	for i, r := range runes {
 		for _, end := range sentenceEndRunes {
 			if r == end {
-				lastIdx = i
+				firstIdx = i
 				break
 			}
 		}
+
+		if firstIdx != -1 {
+			break
+		}
 	}
 
-	if lastIdx < 0 {
+	if firstIdx < 0 {
 		return "", "", false
 	}
 
-	return string(runes[:lastIdx+1]), string(runes[lastIdx+1:]), true
+	return string(runes[:firstIdx+1]), string(runes[firstIdx+1:]), true
 }

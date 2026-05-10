@@ -100,6 +100,7 @@ func TestAgent_StartAndStop(t *testing.T) {
 	brain := mock_voice.NewMockBrain(ctrl)
 	synth := mock_voice.NewMockSynthesizer(ctrl)
 	synth.EXPECT().SampleRate().Return(int32(16000)).AnyTimes()
+	synth.EXPECT().Close(gomock.Any()).Return(nil)
 
 	agent, err := voice.NewAgent(voice.AgentConfig{
 		Transcriber: transcriber,

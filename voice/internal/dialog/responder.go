@@ -108,6 +108,7 @@ func (r *Responder) Close(ctx context.Context) error {
 	return errors.Join(
 		r.CancelResponse(ctx),
 		r.mixer.Close(ctx),
+		r.synthesizer.Close(ctx),
 		helper.WaitWithCtx(ctx, r.wg),
 	)
 }
@@ -197,9 +198,7 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 	brainOut := make(chan core.Token, r.brainBufferSize)
 	synthOut := make(chan core.AudioFrame, r.synthOutBufferSize)
 
-	wg.Add(4)
-
-	r.mixer.SetSpeechSource(synthOut)
+	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
@@ -224,6 +223,11 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 
 	go func() {
 		defer wg.Done()
+		r.forwardSynthToMixer(ctx, synthOut)
+	}()
+
+	go func() {
+		defer wg.Done()
 		r.forwardTokens(ctx, brainOut, synthIn, tokenOut)
 	}()
 
@@ -231,6 +235,34 @@ func (r *Responder) generate(ctx context.Context, prompt string, wg *sync.WaitGr
 		defer wg.Done()
 		r.consumeTokens(ctx, tokenOut)
 	}()
+}
+
+func (r *Responder) forwardSynthToMixer(ctx context.Context, synthOut <-chan core.AudioFrame) {
+	mixerIn := make(chan core.AudioFrame, r.synthOutBufferSize)
+	first := true
+
+	defer func() {
+		if !first {
+			close(mixerIn)
+		}
+	}()
+
+	for frame := range synthOut {
+		if ctx.Err() != nil {
+			return
+		}
+
+		if first {
+			r.mixer.SetSpeechSource(mixerIn)
+			first = false
+		}
+
+		select {
+		case mixerIn <- frame:
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (r *Responder) forwardTokens(ctx context.Context,

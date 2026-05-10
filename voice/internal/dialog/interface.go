@@ -11,6 +11,7 @@ import (
 type Synthesizer interface {
 	SampleRate() int32
 	Synthesize(ctx context.Context, tokens <-chan core.Token, audio chan<- core.AudioFrame) error
+	Close(ctx context.Context) error
 }
 
 type Brain interface {

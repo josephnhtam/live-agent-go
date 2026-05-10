@@ -30,6 +30,10 @@ func (s *GoogleSynthesizer) SampleRate() int32 {
 	return s.options.sampleRate
 }
 
+func (s *GoogleSynthesizer) Close(_ context.Context) error {
+	return nil
+}
+
 func NewGoogleSynthesizer(config GoogleSynthesizerConfig, opts *GoogleSynthesizerOptions) *GoogleSynthesizer {
 	options := opts
 	if options == nil {

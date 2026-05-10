@@ -43,6 +43,20 @@ func (m *MockSynthesizer) EXPECT() *MockSynthesizerMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method.
+func (m *MockSynthesizer) Close(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockSynthesizerMockRecorder) Close(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockSynthesizer)(nil).Close), ctx)
+}
+
 // SampleRate mocks base method.
 func (m *MockSynthesizer) SampleRate() int32 {
 	m.ctrl.T.Helper()

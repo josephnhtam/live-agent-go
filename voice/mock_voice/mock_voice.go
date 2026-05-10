@@ -143,6 +143,20 @@ func (m *MockSynthesizer) EXPECT() *MockSynthesizerMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method.
+func (m *MockSynthesizer) Close(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockSynthesizerMockRecorder) Close(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockSynthesizer)(nil).Close), ctx)
+}
+
 // SampleRate mocks base method.
 func (m *MockSynthesizer) SampleRate() int32 {
 	m.ctrl.T.Helper()
@@ -465,4 +479,126 @@ func (m *MockSession) SendMessage(text string) error {
 func (mr *MockSessionMockRecorder) SendMessage(text any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessage", reflect.TypeOf((*MockSession)(nil).SendMessage), text)
+}
+
+// MockRealtimeModel is a mock of RealtimeModel interface.
+type MockRealtimeModel struct {
+	ctrl     *gomock.Controller
+	recorder *MockRealtimeModelMockRecorder
+	isgomock struct{}
+}
+
+// MockRealtimeModelMockRecorder is the mock recorder for MockRealtimeModel.
+type MockRealtimeModelMockRecorder struct {
+	mock *MockRealtimeModel
+}
+
+// NewMockRealtimeModel creates a new mock instance.
+func NewMockRealtimeModel(ctrl *gomock.Controller) *MockRealtimeModel {
+	mock := &MockRealtimeModel{ctrl: ctrl}
+	mock.recorder = &MockRealtimeModelMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRealtimeModel) EXPECT() *MockRealtimeModelMockRecorder {
+	return m.recorder
+}
+
+// AudioOut mocks base method.
+func (m *MockRealtimeModel) AudioOut() <-chan voice.AudioFrame {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AudioOut")
+	ret0, _ := ret[0].(<-chan voice.AudioFrame)
+	return ret0
+}
+
+// AudioOut indicates an expected call of AudioOut.
+func (mr *MockRealtimeModelMockRecorder) AudioOut() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AudioOut", reflect.TypeOf((*MockRealtimeModel)(nil).AudioOut))
+}
+
+// Done mocks base method.
+func (m *MockRealtimeModel) Done() <-chan error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Done")
+	ret0, _ := ret[0].(<-chan error)
+	return ret0
+}
+
+// Done indicates an expected call of Done.
+func (mr *MockRealtimeModelMockRecorder) Done() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Done", reflect.TypeOf((*MockRealtimeModel)(nil).Done))
+}
+
+// PromptOut mocks base method.
+func (m *MockRealtimeModel) PromptOut() <-chan voice.Prompt {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PromptOut")
+	ret0, _ := ret[0].(<-chan voice.Prompt)
+	return ret0
+}
+
+// PromptOut indicates an expected call of PromptOut.
+func (mr *MockRealtimeModelMockRecorder) PromptOut() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PromptOut", reflect.TypeOf((*MockRealtimeModel)(nil).PromptOut))
+}
+
+// SendAudio mocks base method.
+func (m *MockRealtimeModel) SendAudio(ctx context.Context, frame voice.AudioFrame) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendAudio", ctx, frame)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendAudio indicates an expected call of SendAudio.
+func (mr *MockRealtimeModelMockRecorder) SendAudio(ctx, frame any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAudio", reflect.TypeOf((*MockRealtimeModel)(nil).SendAudio), ctx, frame)
+}
+
+// Start mocks base method.
+func (m *MockRealtimeModel) Start(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockRealtimeModelMockRecorder) Start(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockRealtimeModel)(nil).Start), ctx)
+}
+
+// Stop mocks base method.
+func (m *MockRealtimeModel) Stop(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Stop", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockRealtimeModelMockRecorder) Stop(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockRealtimeModel)(nil).Stop), ctx)
+}
+
+// TokenOut mocks base method.
+func (m *MockRealtimeModel) TokenOut() <-chan voice.Token {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TokenOut")
+	ret0, _ := ret[0].(<-chan voice.Token)
+	return ret0
+}
+
+// TokenOut indicates an expected call of TokenOut.
+func (mr *MockRealtimeModelMockRecorder) TokenOut() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TokenOut", reflect.TypeOf((*MockRealtimeModel)(nil).TokenOut))
 }

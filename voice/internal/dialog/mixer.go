@@ -248,8 +248,10 @@ func (m *mixer) handleCmd(msg mixerMsg) {
 	switch msg.cmd {
 	case cmdSetSpeechSource:
 		m.speechSampleBuf = m.speechSampleBuf[:0]
-		if speechCh, ok := msg.obj.(<-chan core.AudioFrame); ok {
-			m.speechCh = speechCh
+		if ch, ok := msg.obj.(<-chan core.AudioFrame); ok {
+			m.speechCh = ch
+		} else {
+			m.speechCh = nil
 		}
 
 	case cmdStopAllTracks:

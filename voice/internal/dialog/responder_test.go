@@ -18,6 +18,7 @@ func newTestResponder(t *testing.T, ctrl *gomock.Controller) (*dialog.Responder,
 	mockBrain := mock_dialog.NewMockBrain(ctrl)
 	mockSynth := mock_dialog.NewMockSynthesizer(ctrl)
 	mockSynth.EXPECT().SampleRate().Return(int32(16000)).AnyTimes()
+	mockSynth.EXPECT().Close(gomock.Any()).Return(nil).AnyTimes()
 
 	tokenCh := make(chan core.Token, 32)
 	audioCh := make(chan core.AudioFrame, 32)
@@ -122,6 +123,7 @@ func TestResponder_Close(t *testing.T) {
 	mockBrain := mock_dialog.NewMockBrain(ctrl)
 	mockSynth := mock_dialog.NewMockSynthesizer(ctrl)
 	mockSynth.EXPECT().SampleRate().Return(int32(16000)).AnyTimes()
+	mockSynth.EXPECT().Close(gomock.Any()).Return(nil).AnyTimes()
 
 	r := dialog.NewResponder(dialog.ResponderConfig{
 		Brain:                 mockBrain,

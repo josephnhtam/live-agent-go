@@ -17,8 +17,6 @@ type GoogleSynthesizerOptions struct {
 	logger           *slog.Logger
 }
 
-var defaultSentenceEndRunes = []rune{'.', '?', '!', '\n', '\u3002', '\uFF1F', '\uFF01'}
-
 func NewGoogleOptions() *GoogleSynthesizerOptions {
 	return &GoogleSynthesizerOptions{
 		sampleRate:       24000,

@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v3"
+	"gopkg.in/hraban/opus.v2"
 )
 
 type AudioInEncoding int
 
 const (
-	AudioInEncodingPCM  AudioInEncoding = iota
+	AudioInEncodingPCM AudioInEncoding = iota
 	AudioInEncodingOpus
 )
 
@@ -22,6 +23,9 @@ type ManagerOptions struct {
 	audioInEncoding    AudioInEncoding
 	pacingBurst        int
 	connectionTimeout  time.Duration
+	opusBitrate        int
+	opusComplexity     int
+	opusMaxBandwidth   opus.Bandwidth
 	logger             *slog.Logger
 }
 
@@ -31,6 +35,9 @@ func NewManagerOptions() *ManagerOptions {
 		messageBufferSize: 16,
 		pacingBurst:       3,
 		connectionTimeout: 30 * time.Second,
+		opusBitrate:       64000,
+		opusComplexity:    10,
+		opusMaxBandwidth:  opus.Fullband,
 	}
 }
 
@@ -66,6 +73,21 @@ func (o *ManagerOptions) WithPacingBurst(n int) *ManagerOptions {
 
 func (o *ManagerOptions) WithConnectionTimeout(d time.Duration) *ManagerOptions {
 	o.connectionTimeout = d
+	return o
+}
+
+func (o *ManagerOptions) WithOpusBitrate(bps int) *ManagerOptions {
+	o.opusBitrate = bps
+	return o
+}
+
+func (o *ManagerOptions) WithOpusComplexity(n int) *ManagerOptions {
+	o.opusComplexity = n
+	return o
+}
+
+func (o *ManagerOptions) WithOpusMaxBandwidth(bw opus.Bandwidth) *ManagerOptions {
+	o.opusMaxBandwidth = bw
 	return o
 }
 

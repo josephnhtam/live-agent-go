@@ -66,6 +66,22 @@ func newSession(
 		return nil, errors.Join(ErrCreateOpusEncoder, err)
 	}
 
+	if options.opusBitrate > 0 {
+		if err := encoder.SetBitrate(options.opusBitrate); err != nil {
+			return nil, errors.Join(ErrCreateOpusEncoder, err)
+		}
+	}
+	if options.opusComplexity > 0 {
+		if err := encoder.SetComplexity(options.opusComplexity); err != nil {
+			return nil, errors.Join(ErrCreateOpusEncoder, err)
+		}
+	}
+	if options.opusMaxBandwidth > 0 {
+		if err := encoder.SetMaxBandwidth(options.opusMaxBandwidth); err != nil {
+			return nil, errors.Join(ErrCreateOpusEncoder, err)
+		}
+	}
+
 	logger := options.logger
 	if logger == nil {
 		logger = helper.NoopLogger()
